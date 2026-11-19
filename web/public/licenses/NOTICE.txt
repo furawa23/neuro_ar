@@ -1,0 +1,19 @@
+NeuroAR uses these unmodified third-party libraries:
+
+Three.js 0.187.0 (MIT)
+Source: https://github.com/mrdoob/three.js
+License: ./three.txt
+
+@ar-js-org/artoolkit5-js 0.3.2 (LGPL-3.0)
+Includes ARToolKit's compiled computer-vision implementation.
+Source and build instructions: https://github.com/AR-js-org/artoolkit5-js
+Published package: https://www.npmjs.com/package/@ar-js-org/artoolkit5-js/v/0.3.2
+License: ./artoolkit.txt
+
+The ARToolKit module is dynamically loaded and has not been modified.
+To substitute or rebuild it, obtain the source above, replace the dependency
+in web/package.json, run npm install and npm run build. The application source
+and package-lock.json identify the version and integration.
+
+The included camera_para.dat is the generic calibration distributed with
+ARToolKit. It is not a measurement of the Xiaomi Redmi camera.

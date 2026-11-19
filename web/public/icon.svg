@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>NeuroAR</title>
+  <rect width="512" height="512" rx="112" fill="#081016"/>
+  <g fill="none" stroke="#5ce3cc" stroke-width="10" stroke-linecap="round" opacity=".55">
+    <path d="M114 148 256 190 114 256 256 322 114 364M114 148 256 322M114 364 256 190 398 256 256 322"/>
+  </g>
+  <g stroke="#081016" stroke-width="12">
+    <g fill="#5ce3cc"><circle cx="114" cy="148" r="27"/><circle cx="114" cy="256" r="27"/><circle cx="114" cy="364" r="27"/></g>
+    <g fill="#b1a0ff"><circle cx="256" cy="190" r="34"/><circle cx="256" cy="322" r="34"/></g>
+    <circle cx="398" cy="256" r="38" fill="#d1f47b"/>
+  </g>
+</svg>

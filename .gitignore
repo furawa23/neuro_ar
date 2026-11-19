@@ -1,0 +1,35 @@
+# Unity-generated state
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Bb]uilds/
+/MemoryCaptures/
+/Recordings/
+.vs/
+.idea/
+*.csproj.user
+/*.csproj
+*.sln
+*.slnx
+*.user
+*.pidb
+*.pdb
+*.mdb
+# .NET verification output
+**/bin/
+**/obj/
+# Machine-specific setup marker, regenerated on first Unity import
+/ProjectSettings/NeuroARSetup.txt
+# Signing credentials belong outside source control
+*.keystore
+*.jks
+*.keystorepass
+local.properties
+# Web build and dependencies
+**/node_modules/
+/web/dist/
+/web/.firebase/
+/web/firebase-debug.log
+/web/.env*

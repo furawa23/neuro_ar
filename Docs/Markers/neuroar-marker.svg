@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180mm" height="180mm" viewBox="0 0 900 900" shape-rendering="crispEdges">
+  <title>Marcador NeuroAR · cuadrado negro exterior de 140 mm</title>
+  <desc>Patrón binario 7 por 7 con zona blanca de seguridad. Imprimir al cien por ciento. Datos interiores: 10110/01101/11000/00111/10010. No es un código QR.</desc>
+  <rect width="900" height="900" fill="white"/>
+  <rect x="100" y="100" width="700" height="700" fill="black"/>
+  <rect x="200" y="200" width="100" height="100" fill="white"/>
+  <rect x="400" y="200" width="100" height="100" fill="white"/>
+  <rect x="500" y="200" width="100" height="100" fill="white"/>
+  <rect x="300" y="300" width="100" height="100" fill="white"/>
+  <rect x="400" y="300" width="100" height="100" fill="white"/>
+  <rect x="600" y="300" width="100" height="100" fill="white"/>
+  <rect x="200" y="400" width="100" height="100" fill="white"/>
+  <rect x="300" y="400" width="100" height="100" fill="white"/>
+  <rect x="400" y="500" width="100" height="100" fill="white"/>
+  <rect x="500" y="500" width="100" height="100" fill="white"/>
+  <rect x="600" y="500" width="100" height="100" fill="white"/>
+  <rect x="200" y="600" width="100" height="100" fill="white"/>
+  <rect x="500" y="600" width="100" height="100" fill="white"/>
+</svg>

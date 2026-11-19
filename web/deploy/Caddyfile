@@ -1,0 +1,23 @@
+# Sustituye example.com por un dominio cuyo DNS apunte al VPS.
+# Copia el contenido compilado de web/dist a /var/www/neuroar/dist.
+example.com {
+    root * /var/www/neuroar/dist
+    encode zstd gzip
+
+    header {
+        Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    @entry path / /index.html /manifest.webmanifest
+    header @entry Cache-Control no-cache
+
+    @versionedAssets path /assets/*
+    header @versionedAssets Cache-Control "public, max-age=31536000, immutable"
+
+    @manifest path /manifest.webmanifest
+    header @manifest Content-Type application/manifest+json
+
+    file_server
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Imprimir marcador NeuroAR</title>
+<style>
+  @page { size: A4 portrait; margin: 15mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0 auto; max-width: 180mm; font: 14px/1.5 system-ui, sans-serif; color: #111; background: white; }
+  h1 { margin: 0 0 3mm; font-size: 23px; }
+  p { margin: 0 0 3mm; }
+  img { display: block; width: 180mm; height: 180mm; max-width: none; image-rendering: pixelated; }
+  .ruler { width: 50mm; height: 4mm; border: 1px solid; border-top: 0; margin: 4mm 0 2mm; }
+  button { padding: 10px 16px; font: inherit; margin: 12px 0; }
+  @media screen { body { padding: 12px; overflow-x: auto; } }
+  @media print { button { display: none; } }
+</style>
+<h1>NeuroAR · marcador de cámara</h1>
+<p>Imprime en A4, a escala <strong>100 % / tamaño real</strong>. Desactiva encabezados y pies de página. Usa papel mate y conserva todo el margen blanco.</p>
+<button type="button" onclick="window.print()">Imprimir marcador</button>
+<img src="neuroar-marker.svg" alt="Patrón binario de referencia para la cámara de NeuroAR">
+<p>El cuadrado negro exterior debe medir <strong>14 × 14 cm</strong>. La imagen completa con margen blanco mide 18 × 18 cm. Comprueba con una regla antes de usarla.</p>
+<div class="ruler" aria-label="Referencia de impresión de cinco centímetros"></div>
+<p>Esta línea mide 5 cm. En la aplicación toca <strong>Ver marcador</strong>, apunta al patrón completo y mantenlo visible.</p>
+</html>

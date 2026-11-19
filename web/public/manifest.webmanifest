@@ -1,18 +1,18 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "NeuroAR · Laboratorio de redes neuronales",
   "short_name": "NeuroAR",
   "description": "Explora una red neuronal en 3D y sobre un marcador impreso con la cámara de tu Android.",
   "lang": "es",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#081016",
   "theme_color": "#081016",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

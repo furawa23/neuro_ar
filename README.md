@@ -1,6 +1,6 @@
 # NeuroAR · laboratorio web de redes neuronales
 
-Aplicación educativa para Android y navegador: una red neuronal 2–4–1 que puedes explorar en 3D, inspeccionar y entrenar paso a paso. La versión principal está en **[web/](web/README.md)** y genera archivos estáticos para Firebase Hosting o un VPS con HTTPS. No necesita Unity ni ARCore.
+Aplicación educativa para Android y navegador: una red neuronal 2–4–1 que puedes explorar en 3D, inspeccionar y entrenar paso a paso. La versión principal está en **[web/](web/README.md)** y genera archivos estáticos para GitHub Pages, Firebase Hosting o un VPS con HTTPS. No necesita Unity ni ARCore.
 
 ## Empezar
 
@@ -17,9 +17,10 @@ Abre la URL local que muestra Vite. Para generar los archivos que se publican:
 ```powershell
 npm test
 npm run build
+npm run check:build
 ```
 
-El resultado es `web/dist/`. Consulta **[desarrollo y despliegue](web/README.md)** para Firebase y Caddy en un VPS. No se ha publicado en una cuenta o dominio.
+El resultado es `web/dist/`. Consulta **[desarrollo y despliegue](web/README.md)** para GitHub Pages, Firebase y Caddy en un VPS. El workflow de Pages publica los cambios de `web/` en `main` en **https://furawa23.github.io/neuro_ar/**.
 
 ## Funciones
 

@@ -2,7 +2,7 @@
 
 Aplicación web móvil para explorar una red neuronal en 3D, inspeccionar sus parámetros y observar cómo cambia durante un entrenamiento educativo. El modo de cámara coloca la red sobre el marcador impreso de NeuroAR mientras permanece visible.
 
-La carpeta `web` es independiente del proyecto Unity de la raíz. Su compilación produce archivos estáticos que puedes alojar en Firebase Hosting o en un VPS. No requiere Unity para desarrollarla ni compilarla.
+La carpeta `web` es independiente del proyecto Unity de la raíz. Su compilación produce archivos estáticos para GitHub Pages, Firebase Hosting o un VPS. No requiere Unity para desarrollarla ni compilarla.
 
 **Estado:** la prueba física de cámara, seguimiento y rendimiento en el Xiaomi Redmi Note 12S sigue pendiente. El objetivo de esta versión es Chrome en Android; las comprobaciones de escritorio y los tests no certifican la cámara del celular.
 
@@ -22,6 +22,7 @@ Genera la versión distribuible y compruébala localmente:
 
 ```powershell
 npm run build
+npm run check:build
 npm run preview
 ```
 
@@ -30,7 +31,7 @@ El resultado está en `dist/`. `preview` sirve esa compilación para revisarla; 
 ## Cámara en Android
 
 1. Abre la aplicación mediante **HTTPS** en Chrome del Android.
-2. Abre `/markers/imprimir-marcador.html` en un equipo con impresora. Imprime en A4, al 100 % y sin encabezados ni pies. Comprueba que el borde negro exterior mide **14 × 14 cm** y conserva el margen blanco.
+2. Pulsa **Imprimir marcador RA** en la aplicación desde un equipo con impresora. En GitHub Pages la hoja está en `https://furawa23.github.io/neuro_ar/markers/imprimir-marcador.html`. Imprime en A4, al 100 % y sin encabezados ni pies. Comprueba que el borde negro exterior mide **14 × 14 cm** y conserva el margen blanco.
 3. Coloca la hoja plana, bien iluminada y sin reflejos. Activa el modo de cámara y concede el permiso cuando Chrome lo solicite.
 4. Enfoca el marcador completo y su margen. Empieza aproximadamente a 35–80 cm y ajusta la distancia hasta detectarlo. Muévete alrededor conservando el patrón visible.
 5. Toca las neuronas o conexiones para inspeccionarlas. Vuelve al modo 3D para explorar sin la cámara.
@@ -40,6 +41,18 @@ El acceso a la cámara requiere un contexto seguro. `http://localhost` es una ex
 El seguimiento depende de la imagen impresa. No coloca anclajes libres sobre mesas, no conserva la posición cuando se pierde la hoja y no necesita ARCore. El movimiento se calcula a partir de los fotogramas; la precisión depende de la cámara, la luz, el tamaño impreso y el ángulo de visión. Esta primera versión no incluye un service worker ni garantiza funcionamiento sin conexión. El manifiesto permite solicitar una presentación independiente al añadirla a la pantalla de inicio, según las opciones que ofrezca Chrome.
 
 Si no aparece la cámara, revisa que la URL sea HTTPS, que Chrome tenga permiso de cámara tanto en Android como para el sitio y que ninguna otra aplicación la esté usando. Tras cambiar permisos, recarga la página. Si el seguimiento se pierde, vuelve a mostrar el patrón completo sin cubrir bordes ni celdas.
+
+## Publicar en GitHub Pages
+
+El repositorio es `furawa23/neuro_ar` y la URL prevista es **https://furawa23.github.io/neuro_ar/**.
+
+El workflow `.github/workflows/pages.yml` instala dependencias con `npm ci`, ejecuta las pruebas, compila `web/dist`, verifica sus rutas y publica la aplicación al subir cambios de `web/` a `main`. También puede ejecutarse manualmente desde **Actions → Publicar NeuroAR en GitHub Pages → Run workflow**.
+
+La configuración inicial del repositorio debe usar **Settings → Pages → Build and deployment → Source → GitHub Actions**. Publicar directamente la raíz de `main` muestra el README en lugar de compilar la aplicación de `web/`.
+
+`vite.config.js` usa `base: './'`: scripts, hojas de estilo, carga diferida y recursos se resuelven tanto en `/neuro_ar/` como en la raíz de un dominio. El manifiesto y los enlaces del marcador también usan rutas relativas. `npm run check:build` sirve la compilación bajo `/` y `/neuro_ar/` en servidores temporales aislados, verifica los archivos y falla si alguna ruta escapa a la subcarpeta.
+
+La publicación puede seguirse en [Actions del repositorio](https://github.com/furawa23/neuro_ar/actions). Una vez completada, abre la URL de Pages en Chrome del teléfono y concede el permiso de cámara al pulsar **Cámara RA**. No hacen falta secretos de despliegue ni una cuenta Firebase: el workflow utiliza los permisos temporales de GitHub Actions.
 
 ## Publicar en Firebase Hosting
 
@@ -83,4 +96,4 @@ Caddy obtiene y renueva el certificado del dominio y redirige HTTP a HTTPS cuand
 - Al volver de otra aplicación o bloquear/desbloquear el teléfono, el modo 3D sigue disponible y la cámara puede reactivarse.
 - La prueba sostenida permite evaluar temperatura, fluidez y estabilidad reales del dispositivo.
 
-Estos pasos son validación pendiente en el teléfono; disponer de los archivos de despliegue no significa que se hayan publicado en una cuenta o VPS.
+Estos pasos de cámara y rendimiento siguen pendientes de validación en el teléfono; las comprobaciones de compilación y alojamiento no los sustituyen.

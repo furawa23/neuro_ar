@@ -33,3 +33,5 @@ local.properties
 /web/.firebase/
 /web/firebase-debug.log
 /web/.env*
+# Original XR Engine artifacts are restored from the pinned npm package.
+/web/public/external/xr/

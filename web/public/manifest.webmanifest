@@ -2,7 +2,7 @@
   "id": "./",
   "name": "NeuroAR · Laboratorio de redes neuronales",
   "short_name": "NeuroAR",
-  "description": "Explora una red neuronal en 3D y sobre un marcador impreso con la cámara de tu Android.",
+  "description": "Explora una red neuronal en 3D y colócala en tu entorno con seguimiento espacial sin marcador.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",

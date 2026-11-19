@@ -1,8 +1,18 @@
-NeuroAR uses these unmodified third-party libraries:
+NeuroAR includes these third-party libraries and retained prototype assets:
 
 Three.js 0.187.0 (MIT)
 Source: https://github.com/mrdoob/three.js
 License: ./three.txt
+
+@8thwall/engine-binary 1.0.0 (proprietary binary-only license)
+This product includes the XR Engine software developed by Niantic Spatial, Inc.
+Copyright © 2026 Niantic Spatial, Inc. All rights reserved.
+License: https://github.com/8thwall/engine/blob/main/LICENSE
+License guide: https://8thwall.org/docs/engine/license
+The original engine package, including SLAM, is served unmodified from
+external/xr/ together with its bundled notices and license text. It is not
+the MIT-licensed open-source engine package. Its use and redistribution
+are governed by the XR Engine License Agreement.
 
 @ar-js-org/artoolkit5-js 0.3.2 (LGPL-3.0)
 Includes ARToolKit's compiled computer-vision implementation.
@@ -10,10 +20,10 @@ Source and build instructions: https://github.com/AR-js-org/artoolkit5-js
 Published package: https://www.npmjs.com/package/@ar-js-org/artoolkit5-js/v/0.3.2
 License: ./artoolkit.txt
 
-The ARToolKit module is dynamically loaded and has not been modified.
-To substitute or rebuild it, obtain the source above, replace the dependency
-in web/package.json, run npm install and npm run build. The application source
-and package-lock.json identify the version and integration.
+The earlier marker-based prototype and its tests/assets are retained for
+reference. ARToolKit is not the runtime used by the markerless SLAM mode.
+The retained ARToolKit module has not been modified. Its source and build
+instructions are available above; it remains governed by LGPL-3.0.
 
 The included camera_para.dat is the generic calibration distributed with
 ARToolKit. It is not a measurement of the Xiaomi Redmi camera.

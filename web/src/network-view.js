@@ -19,10 +19,14 @@ export class NetworkView {
     if (!stage) throw new TypeError('A stage element is required.');
     this.stage = stage;
     this.onSelect = onSelect;
+    this.onPlace = null;
     this.onFrame = null;
     this.onError = null;
     this.available = false;
     this.isArMode = false;
+    this.placed = false;
+    this.modelScale = 1;
+    this.lastTrackedFrame = -Infinity;
     this.disposed = false;
     this.selection = { kind: 'neuron', layer: 1, index: 0 };
     this.scene = new THREE.Scene();
@@ -90,6 +94,7 @@ export class NetworkView {
     this.materials.add(this.grid.material);
     this.scene.add(this.grid);
     this.buildGraph();
+    this.buildReticle();
     this.bindPointers();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(stage);
@@ -180,6 +185,25 @@ export class NetworkView {
     this.connections.push({ group, solid, dashes, hit, material, selection, length, weight: 0 });
   }
 
+  buildReticle() {
+    this.reticle = new THREE.Group();
+    this.reticle.visible = false;
+    this.scene.add(this.reticle);
+    const material = this.material(new THREE.MeshBasicMaterial({
+      color: COLORS.selected,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+    }));
+    const ring = new THREE.Mesh(this.geometry(new THREE.RingGeometry(0.055, 0.065, 48)), material);
+    ring.rotation.x = -Math.PI / 2;
+    this.reticle.add(ring);
+    const center = new THREE.Mesh(this.geometry(new THREE.CircleGeometry(0.009, 24)), material);
+    center.rotation.x = -Math.PI / 2;
+    this.reticle.add(center);
+  }
+
   geometry(value) { this.geometries.add(value); return value; }
   material(value) { this.materials.add(value); return value; }
 
@@ -225,9 +249,10 @@ export class NetworkView {
   }
 
   choose(selection) {
-    if (this.isArMode && !this.anchor.visible) return;
+    if (this.isArMode && (!this.placed || !this.anchor.visible)) return false;
     this.select(selection);
     this.onSelect?.(selection);
+    return true;
   }
 
   pulse() { this.pulseStarted = performance.now() / 1000; }
@@ -235,15 +260,18 @@ export class NetworkView {
   setArMode(enabled) {
     if (!this.available || this.isArMode === enabled) return;
     this.isArMode = enabled;
+    this.lastTrackedFrame = -Infinity;
     this.camera = enabled ? this.arCamera : this.previewCamera;
     this.controls.enabled = !enabled;
     this.grid.visible = !enabled;
     this.anchor.visible = false;
+    this.placed = false;
+    if (this.reticle) this.reticle.visible = false;
     if (enabled) {
       this.anchor.add(this.content);
-      this.content.position.set(0, 0.07, 0);
+      this.content.position.set(0, 0.25 * this.modelScale, 0);
       this.content.rotation.set(0, 0, 0);
-      this.content.scale.setScalar(0.05);
+      this.content.scale.setScalar(0.2 * this.modelScale);
     } else {
       this.scene.add(this.content);
       this.content.position.set(0, 0, 0);
@@ -251,6 +279,41 @@ export class NetworkView {
       this.content.scale.setScalar(1);
     }
     this.content.updateMatrixWorld(true);
+  }
+
+  /** Placement and camera tracking are independent: losing tracking never re-places the model. */
+  setPlacementState(placed) {
+    this.placed = Boolean(placed);
+    if (!this.placed) this.anchor.visible = false;
+    if (this.reticle && this.placed) this.reticle.visible = false;
+  }
+
+  /** Show a measured surface hit in world space, independently of the hidden model anchor. */
+  setReticle(pose) {
+    if (!this.reticle) return;
+    const position = pose?.position;
+    if (!this.isArMode || this.placed || !position || ![position.x, position.y, position.z].every(Number.isFinite)) {
+      this.reticle.visible = false;
+      return;
+    }
+    this.reticle.position.set(position.x, position.y, position.z);
+    const rotation = pose.rotation;
+    if (rotation && [rotation.x, rotation.y, rotation.z, rotation.w].every(Number.isFinite) && Math.hypot(rotation.x, rotation.y, rotation.z, rotation.w) > 0) {
+      this.reticle.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w).normalize();
+    } else this.reticle.quaternion.identity();
+    this.reticle.visible = true;
+    this.reticle.updateMatrixWorld(true);
+  }
+
+  setModelScale(factor) {
+    if (!Number.isFinite(factor)) throw new RangeError('Model scale must be finite.');
+    this.modelScale = THREE.MathUtils.clamp(factor, 0.5, 2);
+    if (this.isArMode) {
+      this.content.scale.setScalar(0.2 * this.modelScale);
+      this.content.position.y = 0.25 * this.modelScale;
+      this.content.updateMatrixWorld(true);
+    }
+    return this.modelScale;
   }
 
   resetView() {
@@ -308,23 +371,31 @@ export class NetworkView {
   }
 
   pick(clientX, clientY) {
-    if (this.isArMode && !this.anchor.visible) return;
     const bounds = this.renderer.domElement.getBoundingClientRect();
-    if (clientX < bounds.left || clientX > bounds.right || clientY < bounds.top || clientY > bounds.bottom) return;
-    this.pointer.set((clientX - bounds.left) / bounds.width * 2 - 1, -(clientY - bounds.top) / bounds.height * 2 + 1);
+    if (clientX < bounds.left || clientX > bounds.right || clientY < bounds.top || clientY > bounds.bottom) return false;
+    const normalizedX = (clientX - bounds.left) / bounds.width;
+    const normalizedY = (clientY - bounds.top) / bounds.height;
+    if (this.isArMode && !this.placed) {
+      if (!this.onPlace) return false;
+      this.onPlace(normalizedX, normalizedY);
+      return true;
+    }
+    if (this.isArMode && !this.anchor.visible) return false;
+    this.pointer.set(normalizedX * 2 - 1, -normalizedY * 2 + 1);
     this.scene.updateMatrixWorld(true);
     this.camera.updateMatrixWorld(true);
     if (this.isArMode) {
-      // AR uses a generic THREE.Camera with ARToolKit's calibrated projection.
+      // World tracking supplies a calibrated projection and six-degree camera pose.
       this.arCamera.projectionMatrixInverse.copy(this.arCamera.projectionMatrix).invert();
       const origin = new THREE.Vector3().setFromMatrixPosition(this.arCamera.matrixWorld);
       this.direction.set(this.pointer.x, this.pointer.y, 0.5).unproject(this.arCamera).sub(origin).normalize();
       this.raycaster.set(origin, this.direction);
     } else this.raycaster.setFromCamera(this.pointer, this.previewCamera);
     const nodeHits = this.raycaster.intersectObjects(this.nodes.map(node => node.mesh), false);
-    if (nodeHits.length) { this.choose(nodeHits[0].object.userData.selection); return; }
+    if (nodeHits.length) return this.choose(nodeHits[0].object.userData.selection);
     const connectionHits = this.raycaster.intersectObjects(this.connections.map(connection => connection.hit), false);
-    if (connectionHits.length) this.choose(connectionHits[0].object.userData.selection);
+    if (connectionHits.length) return this.choose(connectionHits[0].object.userData.selection);
+    return false;
   }
 
   animate(milliseconds) {
@@ -336,8 +407,22 @@ export class NetworkView {
       if (this.onError) this.onError(error);
       else console.error('NeuroAR frame update failed:', error);
     }
+    // During tracking, draw only from the SDK's camera-render callback. Keep
+    // this loop alive for watchdogs and to clear a stale or stopped AR frame.
+    if (!this.isArMode || milliseconds - this.lastTrackedFrame > 100) this.drawSceneFrame(milliseconds);
+    this.frameId = requestAnimationFrame(this.animate);
+  }
+
+  renderTrackedFrame(milliseconds = performance.now()) {
+    if (!this.available || !this.isArMode || this.disposed) return;
+    this.lastTrackedFrame = milliseconds;
+    this.drawSceneFrame(milliseconds);
+  }
+
+  drawSceneFrame(milliseconds = performance.now()) {
+    if (!this.available || this.disposed) return;
     if (!this.isArMode) this.controls.update();
-    const pulseAge = seconds - this.pulseStarted;
+    const pulseAge = milliseconds / 1000 - this.pulseStarted;
     for (const node of this.nodes) {
       const arrival = node.layer * 0.52;
       const glow = Math.max(0, 1 - Math.abs(pulseAge - arrival - 0.16) / 0.24);
@@ -346,7 +431,7 @@ export class NetworkView {
     }
     this.scene.updateMatrixWorld(true);
     this.camera.updateMatrixWorld(true);
-    const visible = !this.isArMode || this.anchor.visible;
+    const visible = !this.isArMode || (this.placed && this.anchor.visible);
     for (const node of this.nodes) {
       this.point.copy(node.mesh.position);
       this.point.y -= 0.26;
@@ -359,7 +444,6 @@ export class NetworkView {
       this.projectLabel(label.element, this.point, visible);
     }
     this.renderer.render(this.scene, this.camera);
-    this.frameId = requestAnimationFrame(this.animate);
   }
 
   projectLabel(element, worldPosition, enabled) {
@@ -388,6 +472,7 @@ export class NetworkView {
     }
     for (const node of this.nodes) node.button.remove();
     for (const label of this.layerLabels ?? []) label.element.remove();
+    this.reticle?.removeFromParent();
   }
 }
 

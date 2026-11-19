@@ -1,7 +1,7 @@
 import './styles.css';
 import { TrainingSession, TinyNetwork } from './core/network.js';
 import { NetworkView } from './network-view.js';
-import { MarkerTracker } from './ar/marker-tracker.js';
+import { WorldTracker } from './ar/world-tracker.js';
 
 const $ = (id) => document.getElementById(id);
 const n = (value) => Number(value).toFixed(3);
@@ -29,12 +29,24 @@ function select(selection) {
 try {
   view = new NetworkView({ stage: $('stage'), onSelect: select });
   if (view.available === false) throw new Error('WebGL no disponible');
-  tracker = new MarkerTracker({
+  tracker = new WorldTracker({
     renderer: view.renderer, camera: view.arCamera, anchor: view.anchor,
     onStatus: message => { if (arMode || startingCamera) $('tracking-status').textContent = message; },
-    onTracking: visible => { $('stage').setAttribute('aria-label', visible ? 'Red neuronal sobre el marcador visible' : 'Busca el marcador completo con la cámara'); },
+    onTracking: visible => { $('stage').setAttribute('aria-label', visible ? 'Seguimiento espacial activo; coloca la red o explora sus neuronas' : 'Reconociendo el entorno con la cámara'); },
+    onPlacement: placed => {
+      view.setPlacementState(placed);
+      $('place-button').hidden = placed;
+      $('reset-view').textContent = arMode ? 'Volver a colocar' : 'Centrar vista';
+      $('reset-view').hidden = arMode && !placed;
+    },
+    onReticle: pose => {
+      view.setReticle(pose);
+      $('place-button').disabled = !pose;
+    },
+    onRender: milliseconds => view.renderTrackedFrame(milliseconds),
     onStop: reason => { if (arMode) { setMode(false); $('tracking-status').textContent = reason; } },
   });
+  view.onPlace = (x, y) => tracker.placeAt(x, y);
   view.onFrame = time => tracker?.update(time);
 } catch (error) {
   console.error(error);
@@ -192,20 +204,29 @@ $('parameter').addEventListener('input', event => {
   refresh();
 });
 $('pulse-button').addEventListener('click', () => view?.pulse());
-$('reset-view').addEventListener('click', () => { if (arMode) $('tracking-status').textContent = 'Muestra el marcador completo, plano y con buena luz.'; else view?.resetView(); });
+$('reset-view').addEventListener('click', () => { if (arMode) tracker?.reposition(); else view?.resetView(); });
+$('place-button').addEventListener('click', () => tracker?.placeAt(0.5, 0.5));
+$('model-scale').addEventListener('input', event => {
+  const scale = view?.setModelScale(Number(event.target.value)) ?? 1;
+  $('scale-value').textContent = `${scale.toFixed(1)}×`;
+});
 
 async function setMode(enabled) {
-  if ((startingCamera && enabled) || !view || !tracker) return;
+  if ((enabled && arMode) || (startingCamera && enabled) || !view || !tracker) return;
   const ticket = ++modeGeneration;
   pause();
   arMode = enabled;
   view.setArMode(enabled);
   document.body.classList.toggle('ar-mode', enabled);
+  $('ar-tools').hidden = !enabled;
+  $('place-button').hidden = false;
+  $('place-button').disabled = true;
   $('mode-ar').classList.toggle('active', enabled);
   $('mode-3d').classList.toggle('active', !enabled);
   $('mode-ar').setAttribute('aria-pressed', enabled);
   $('mode-3d').setAttribute('aria-pressed', !enabled);
-  $('reset-view').textContent = enabled ? 'Buscar marcador' : 'Centrar vista';
+  $('reset-view').textContent = enabled ? 'Volver a colocar' : 'Centrar vista';
+  $('reset-view').hidden = enabled;
   if (!enabled) {
     startingCamera = false;
     tracker.stop();
@@ -219,6 +240,10 @@ async function setMode(enabled) {
   $('mode-ar').disabled = true;
   // The user can cancel while the browser is awaiting camera permission.
   $('mode-3d').disabled = false;
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    $('stage').scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
+  }
   try { await tracker.start(); }
   catch (error) {
     if (ticket !== modeGeneration) return;
@@ -241,6 +266,8 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', () => { pause(); tracker?.stop(); });
 $('help-button').addEventListener('click', () => $('help-dialog').showModal());
+$('ar-info-button').addEventListener('click', () => $('help-dialog').showModal());
+$('start-ar-from-help').addEventListener('click', () => { $('help-dialog').close(); setMode(true); });
 $('close-help').addEventListener('click', () => $('help-dialog').close());
 $('help-dialog').addEventListener('click', event => { if (event.target === $('help-dialog')) { const rect = event.target.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.target.close(); } });
 refresh();

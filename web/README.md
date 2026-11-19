@@ -1,14 +1,37 @@
-# NeuroAR web · Android
+# NeuroAR web · Android · RA sin marcador
 
-Aplicación web móvil para explorar una red neuronal en 3D, inspeccionar sus parámetros y observar cómo cambia durante un entrenamiento educativo. El modo de cámara coloca la red sobre el marcador impreso de NeuroAR mientras permanece visible.
+Laboratorio educativo para explorar una red neuronal en 3D, inspeccionar sus parámetros y observar un entrenamiento. **RA sin marcador** utiliza SLAM de 8th Wall: estima el movimiento de la cámara respecto al entorno y permite colocar la red en un punto del espacio. Después de colocarla puedes acercarte y recorrerla con el celular mientras se mantenga el seguimiento.
 
-La carpeta `web` es independiente del proyecto Unity de la raíz. Su compilación produce archivos estáticos para GitHub Pages, Firebase Hosting o un VPS. No requiere Unity para desarrollarla ni compilarla.
+`web/` es independiente del proyecto Unity de la raíz. Su compilación produce archivos estáticos para GitHub Pages, Firebase Hosting o un VPS con HTTPS.
 
-**Estado:** la prueba física de cámara, seguimiento y rendimiento en el Xiaomi Redmi Note 12S sigue pendiente. El objetivo de esta versión es Chrome en Android; las comprobaciones de escritorio y los tests no certifican la cámara del celular.
+**Estado de validación:** la cámara, el seguimiento espacial, la colocación y el rendimiento del Xiaomi Redmi Note 12S siguen pendientes de prueba física. El objetivo inicial es Chrome actualizado en Android. Los tests matemáticos, la compilación y la revisión en escritorio no certifican que la RA funcione en un dispositivo concreto. **Explorar 3D** sigue disponible como modo sin cámara.
+
+## Usar la RA en Android
+
+1. Abre **https://furawa23.github.io/neuro_ar/** directamente en Chrome del teléfono. Usa una URL HTTPS y evita el navegador integrado de otra aplicación para esta primera prueba.
+2. Activa **RA sin marcador**. Concede el permiso de cámara y el de sensores de movimiento si el navegador lo solicita.
+3. Encuadra una superficie horizontal con detalles visibles. Puede ser el suelo o una mesa; usa una sola como referencia y evita encuadrar ambas a la vez. Busca luz uniforme y una zona sin reflejos.
+4. Mueve el teléfono lentamente para que el motor reconozca detalles del entorno. Una superficie lisa, oscura o borrosa dificulta obtener una referencia estable.
+5. Cuando la aplicación esté preparada, toca dentro del área de cámara para **Colocar** la red. Su anclaje se calcula en el espacio seguido por el motor.
+6. Camina despacio alrededor o acércate a las neuronas. Toca una neurona o conexión para inspeccionarla; también puedes modificar parámetros, entrenar y recorrer el historial.
+7. Para cambiar de sitio utiliza **Volver a colocar** y toca otra posición. Si el seguimiento deriva o se interrumpe, apunta de nuevo a una zona con detalles antes de colocarla.
+8. Vuelve a **Explorar 3D** para detener la sesión de cámara y explorar con giro y zoom en pantalla.
+
+No se necesita un marcador impreso. La posición y el tamaño de la red son aproximados; no constituyen una medición de la superficie. El seguimiento puede interrumpirse por movimientos rápidos, desenfoque, cambios de luz o falta de textura. La sesión no representa un anclaje permanente guardado para futuras visitas.
+
+## Requisitos y permisos
+
+La cámara necesita HTTPS; `http://localhost` es una excepción para desarrollo en el mismo equipo. Desde otro dispositivo, `http://192.168.x.x:5173` no equivale a `localhost`. Para probar la RA en el Redmi usa la URL HTTPS de Pages o de otro alojamiento.
+
+8th Wall requiere cámara mediante `getUserMedia`, WebGL, WebAssembly SIMD y orientación del dispositivo para SLAM. Consulta sus [requisitos oficiales del navegador](https://8thwall.org/docs/troubleshooting/browser-requirements). El seguimiento se ejecuta en la web y esta integración no exige que el Android esté certificado para ARCore; eso no garantiza por sí solo la compatibilidad del hardware o de sus sensores.
+
+Si la cámara no se abre, comprueba los permisos del sitio y los de Chrome en Android, y cierra otras aplicaciones que puedan estar utilizándola. Si se deniega un permiso, puedes seguir en 3D y reintentar la RA después de corregirlo. Una interrupción, bloqueo de pantalla o cambio de aplicación puede requerir iniciar de nuevo la sesión y volver a colocar la red.
+
+El manifiesto permite añadir la aplicación a la pantalla de inicio según las opciones de Chrome. Esta versión no incluye una garantía de uso sin conexión.
 
 ## Desarrollo y compilación
 
-Instala Node.js **22.12 o posterior**, con npm, de acuerdo con `engines` en `package.json`. Desde la raíz del repositorio:
+Instala Node.js **22.12 o posterior**, con npm. Desde la raíz del repositorio:
 
 ```powershell
 cd web
@@ -16,49 +39,36 @@ npm install
 npm run dev
 ```
 
-Abre la dirección local que muestre Vite, normalmente `http://localhost:5173`. Para probar en escritorio puedes explorar la red en 3D; la cámara necesita un dispositivo o webcam disponible y el permiso del navegador.
+Abre la URL local de Vite, normalmente `http://127.0.0.1:5173/`. Para explorar en escritorio utiliza el modo 3D; disponer de una webcam no sustituye la validación del seguimiento móvil.
 
-Genera la versión distribuible y compruébala localmente:
+Para compilar y revisar el resultado:
 
 ```powershell
+npm test
 npm run build
 npm run check:build
 npm run preview
 ```
 
-El resultado está en `dist/`. `preview` sirve esa compilación para revisarla; en producción publica `dist/` con HTTPS. Los archivos de `public/` se copian al compilar, incluidos el manifiesto, el icono y la hoja imprimible.
+Publica el contenido completo de `dist/`. La compilación incluye los recursos del motor bajo `external/xr/`; conserva esa carpeta completa junto con los avisos y licencias del paquete. `preview` solo sirve para revisar la compilación localmente.
 
-## Cámara en Android
-
-1. Abre la aplicación mediante **HTTPS** en Chrome del Android.
-2. Pulsa **Imprimir marcador RA** en la aplicación desde un equipo con impresora. En GitHub Pages la hoja está en `https://furawa23.github.io/neuro_ar/markers/imprimir-marcador.html`. Imprime en A4, al 100 % y sin encabezados ni pies. Comprueba que el borde negro exterior mide **14 × 14 cm** y conserva el margen blanco.
-3. Coloca la hoja plana, bien iluminada y sin reflejos. Activa el modo de cámara y concede el permiso cuando Chrome lo solicite.
-4. Enfoca el marcador completo y su margen. Empieza aproximadamente a 35–80 cm y ajusta la distancia hasta detectarlo. Muévete alrededor conservando el patrón visible.
-5. Toca las neuronas o conexiones para inspeccionarlas. Vuelve al modo 3D para explorar sin la cámara.
-
-El acceso a la cámara requiere un contexto seguro. `http://localhost` es una excepción para desarrollo en el dispositivo que abre esa dirección. Para exponer Vite en la red local puedes ejecutar `npm run dev -- --host 0.0.0.0`, pero entrar desde el celular en `http://192.168.x.x:5173` **no** equivale a `localhost`: permite revisar el modo 3D, mientras el navegador puede bloquear la cámara. Publica una compilación en HTTPS para probarla en el Redmi. Este requisito procede de [getUserMedia y sus condiciones de seguridad](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#privacy_and_security).
-
-El seguimiento depende de la imagen impresa. No coloca anclajes libres sobre mesas, no conserva la posición cuando se pierde la hoja y no necesita ARCore. El movimiento se calcula a partir de los fotogramas; la precisión depende de la cámara, la luz, el tamaño impreso y el ángulo de visión. Esta primera versión no incluye un service worker ni garantiza funcionamiento sin conexión. El manifiesto permite solicitar una presentación independiente al añadirla a la pantalla de inicio, según las opciones que ofrezca Chrome.
-
-Si no aparece la cámara, revisa que la URL sea HTTPS, que Chrome tenga permiso de cámara tanto en Android como para el sitio y que ninguna otra aplicación la esté usando. Tras cambiar permisos, recarga la página. Si el seguimiento se pierde, vuelve a mostrar el patrón completo sin cubrir bordes ni celdas.
+Para exponer el servidor de desarrollo a la red local puedes ejecutar `npm run dev -- --host 0.0.0.0`. La dirección HTTP de red sirve para revisar la interfaz 3D; usa un alojamiento HTTPS para probar cámara y sensores desde el teléfono.
 
 ## Publicar en GitHub Pages
 
-El repositorio es `furawa23/neuro_ar` y la URL prevista es **https://furawa23.github.io/neuro_ar/**.
+Repositorio: **https://github.com/furawa23/neuro_ar/**. Aplicación: **https://furawa23.github.io/neuro_ar/**.
 
-El workflow `.github/workflows/pages.yml` instala dependencias con `npm ci`, ejecuta las pruebas, compila `web/dist`, verifica sus rutas y publica la aplicación al subir cambios de `web/` a `main`. También puede ejecutarse manualmente desde **Actions → Publicar NeuroAR en GitHub Pages → Run workflow**.
+El workflow `.github/workflows/pages.yml` instala dependencias con `npm ci`, ejecuta las pruebas, compila `web/dist`, verifica sus rutas y publica al subir cambios de `web/` a `main`. También puede iniciarse desde **Actions → Publicar NeuroAR en GitHub Pages → Run workflow**.
 
-La configuración inicial del repositorio debe usar **Settings → Pages → Build and deployment → Source → GitHub Actions**. Publicar directamente la raíz de `main` muestra el README en lugar de compilar la aplicación de `web/`.
+La configuración inicial debe usar **Settings → Pages → Build and deployment → Source → GitHub Actions**. Publicar directamente la raíz de `main` muestra el README en lugar de compilar la aplicación.
 
-`vite.config.js` usa `base: './'`: scripts, hojas de estilo, carga diferida y recursos se resuelven tanto en `/neuro_ar/` como en la raíz de un dominio. El manifiesto y los enlaces del marcador también usan rutas relativas. `npm run check:build` sirve la compilación bajo `/` y `/neuro_ar/` en servidores temporales aislados, verifica los archivos y falla si alguna ruta escapa a la subcarpeta.
+`vite.config.js` usa `base: './'` para que los recursos funcionen bajo `/neuro_ar/` y en la raíz de un dominio. Conserva también las rutas relativas de los archivos del motor. `npm run check:build` comprueba la compilación en servidores temporales bajo `/` y `/neuro_ar/`, sin ocultar errores con una respuesta de página única.
 
-La publicación puede seguirse en [Actions del repositorio](https://github.com/furawa23/neuro_ar/actions). Una vez completada, abre la URL de Pages en Chrome del teléfono y concede el permiso de cámara al pulsar **Cámara RA**. No hacen falta secretos de despliegue ni una cuenta Firebase: el workflow utiliza los permisos temporales de GitHub Actions.
+Sigue el resultado en [Actions del repositorio](https://github.com/furawa23/neuro_ar/actions). Tras completarse, abre la URL de Pages en Chrome del Android, activa la RA y valida la colocación caminando lentamente alrededor de la red. El workflow utiliza los permisos temporales de GitHub Actions y no necesita secretos Firebase.
 
 ## Publicar en Firebase Hosting
 
-`firebase.json` ya configura `dist` como carpeta pública. No se incluye un proyecto de Firebase asociado ni credenciales. Necesitas un proyecto de tu cuenta con Hosting habilitado.
-
-Desde `web/`, después de compilar:
+`firebase.json` configura `dist` como carpeta pública. Utiliza un proyecto propio con Hosting habilitado y, desde `web/`, después de compilar:
 
 ```powershell
 npm install --global firebase-tools
@@ -66,34 +76,39 @@ firebase login
 firebase deploy --only hosting --project TU_PROJECT_ID
 ```
 
-Sustituye `TU_PROJECT_ID` por el identificador real del proyecto. `firebase login` abre la autenticación de tu cuenta; `deploy` publica en el proyecto indicado. No es necesario ejecutar `firebase init` ni añadir el SDK de Firebase a la aplicación para servir estos archivos estáticos. El comando mostrará la URL HTTPS que debes abrir en el celular. Consulta la [guía oficial de Firebase Hosting](https://firebase.google.com/docs/hosting/quickstart) para crear el proyecto y autenticar la CLI.
+Sustituye `TU_PROJECT_ID` por el identificador real. No hace falta añadir el SDK de Firebase a la aplicación para servir los archivos estáticos. El comando mostrará la URL HTTPS. Consulta la [guía oficial de Firebase Hosting](https://firebase.google.com/docs/hosting/quickstart).
 
-La configuración permite `camera=(self)`, desactiva micrófono y geolocalización y aplica caché prolongada a los archivos compilados con nombre versionado de `assets/`. La página y el manifiesto se revalidan. Puedes revisar estos ajustes en la [referencia de configuración de Hosting](https://firebase.google.com/docs/hosting/full-config).
+La configuración permite cámara del mismo origen, desactiva micrófono y geolocalización y aplica caché prolongada a los archivos compilados con nombre versionado de `assets/`. La página y el manifiesto se revalidan. Los archivos del motor también deben publicarse: copia siempre la compilación completa.
 
 ## Publicar en un VPS con Caddy
 
-Se incluye `deploy/Caddyfile`, preparado para servir `/var/www/neuroar/dist` con un dominio. Requiere un VPS Linux con Caddy instalado, un dominio cuyo DNS apunte al servidor y los puertos TCP 80 y 443 accesibles.
+Se incluye `deploy/Caddyfile`, preparado para `/var/www/neuroar/dist` con un dominio y HTTPS. Requiere Caddy instalado, DNS apuntando al VPS y puertos TCP 80 y 443 accesibles.
 
-1. Compila localmente con `npm run build` y copia el **contenido** de `dist/` al servidor, en `/var/www/neuroar/dist/`. El archivo principal debe quedar en `/var/www/neuroar/dist/index.html`, sin una carpeta `dist` adicional dentro.
-2. Cambia `example.com` en `deploy/Caddyfile` por tu dominio real. Conserva una copia de la configuración existente si el VPS ya aloja otros sitios e incorpora el bloque nuevo a esa configuración.
-3. Usa el bloque como configuración de Caddy y valida antes de recargar:
+1. Compila y copia el **contenido completo** de `dist/` a `/var/www/neuroar/dist/`. `index.html` y `external/` deben quedar directamente dentro de ese directorio.
+2. Cambia `example.com` por tu dominio. Si ya hay otros sitios, conserva la configuración existente e incorpora el bloque nuevo.
+3. Valida la configuración antes de recargar:
 
 ```bash
 sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 sudo systemctl reload caddy
 ```
 
-El usuario del servicio Caddy debe poder recorrer `/var/www/neuroar` y leer los archivos compilados. Para la instalación y el servicio consulta la [documentación de Caddy en Linux](https://caddyserver.com/docs/running#linux-service).
+El usuario del servicio debe poder recorrer y leer el directorio. Consulta [Caddy en Linux](https://caddyserver.com/docs/running#linux-service) y [HTTPS automático](https://caddyserver.com/docs/automatic-https). El servidor de producción no necesita ejecutar Vite o Node.js.
 
-Caddy obtiene y renueva el certificado del dominio y redirige HTTP a HTTPS cuando están correctamente configurados el DNS y el acceso desde Internet. Abre `https://tu-dominio` en el teléfono. Los requisitos de emisión están en [HTTPS automático de Caddy](https://caddyserver.com/docs/automatic-https). El servidor solo necesita los archivos compilados: no es necesario ejecutar Vite o Node.js para atender la aplicación.
+## Motor y licencia
 
-## Comprobación antes de compartir la URL
+Se utiliza el paquete de distribución gratuita **`@8thwall/engine-binary@1.0.0`**, que incluye SLAM. Su licencia permite distribuir el binario original con una aplicación y alojarlo en infraestructura propia. Es software propietario: no es el paquete MIT del motor abierto y no debe modificarse ni descompilarse. Conserva sus avisos y consulta la [licencia oficial](https://8thwall.org/docs/engine/license) y los [avisos incluidos](public/licenses/NOTICE.txt).
 
-- La página, scripts, icono y marcador cargan con HTTPS y sin errores 404.
-- El permiso de cámara se solicita al activar esa función y puede rechazarse sin perder el modo 3D.
-- La cámara trasera funciona en Chrome del Redmi, el patrón se detecta y la red se oculta al perderlo.
-- Se pueden seleccionar neuronas y conexiones, editar parámetros, entrenar y recorrer el historial con la cámara y en 3D.
-- Al volver de otra aplicación o bloquear/desbloquear el teléfono, el modo 3D sigue disponible y la cámara puede reactivarse.
-- La prueba sostenida permite evaluar temperatura, fluidez y estabilidad reales del dispositivo.
+La aplicación conserva archivos y pruebas del prototipo anterior con ARToolkit y marcador impreso como referencia histórica. Esos archivos no forman parte del flujo inicial de **RA sin marcador**.
 
-Estos pasos de cámara y rendimiento siguen pendientes de validación en el teléfono; las comprobaciones de compilación y alojamiento no los sustituyen.
+## Prueba física antes de compartir
+
+- Abrir la URL HTTPS y comprobar que el motor y la interfaz cargan sin errores de recursos.
+- Aceptar o rechazar permisos y confirmar que 3D sigue disponible.
+- Establecer seguimiento, colocar la red y verificar que conserva su posición al caminar alrededor.
+- Seleccionar neuronas y conexiones, editar, entrenar y recorrer el historial en RA.
+- Volver a colocar la red, cambiar a 3D y reiniciar la cámara.
+- Bloquear y desbloquear el teléfono, cambiar de aplicación y comprobar la recuperación.
+- Evaluar temperatura, fluidez y deriva con uso sostenido en el Redmi.
+
+Estas comprobaciones de cámara y movimiento siguen pendientes en el teléfono; las pruebas automatizadas no las sustituyen.

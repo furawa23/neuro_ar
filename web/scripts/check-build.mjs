@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const mimeTypes = {
@@ -92,6 +93,11 @@ async function checkPrefix(prefix, files) {
       if (url) await get(url);
     }
     for (const file of files) {
+      if (file.startsWith('external/xr/')) {
+        // Opaque vendor artifacts are served intact; do not parse their code.
+        await get(new URL(file, base));
+        continue;
+      }
       if (!/\.(?:js|css)$/.test(file)) continue;
       const url = new URL(file, base);
       const source = (await get(url)).toString('utf8');
@@ -143,6 +149,17 @@ try {
   catch { throw new Error('No existe web/dist/index.html. Ejecuta npm run build antes de npm run check:build.'); }
   const files = await listFiles(dist);
   assert.ok(files.some(file => /^assets\/.*\.js$/.test(file)), 'La compilación no contiene módulos JavaScript.');
+  const engineRoot = fileURLToPath(new URL('../node_modules/@8thwall/engine-binary/dist/', import.meta.url));
+  const engineFiles = await listFiles(engineRoot);
+  assert.ok(engineFiles.includes('xr.js') && engineFiles.includes('xr-slam.js'), 'Falta el motor con seguimiento espacial.');
+  for (const file of engineFiles) {
+    const original = await readFile(path.join(engineRoot, file));
+    const distributed = await readFile(path.join(dist, 'external/xr', file));
+    const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+    assert.equal(hash(distributed), hash(original), `El motor debe distribuirse sin cambios: ${file}`);
+  }
+  await stat(path.join(dist, 'licenses/8thwall-engine.txt'));
+  console.log(`PASS: ${engineFiles.length} archivos originales de XR Engine sin modificaciones.`);
   for (const prefix of ['/', '/neuro_ar/']) await checkPrefix(prefix, files);
 } catch (error) {
   console.error(`FAIL: ${error.message}`);

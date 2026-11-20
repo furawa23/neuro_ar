@@ -4,6 +4,27 @@ Laboratorio educativo para explorar una red neuronal en 3D, inspeccionar sus par
 
 `web/` es independiente del proyecto Unity de la raíz. Su compilación produce archivos estáticos para GitHub Pages, Firebase Hosting o un VPS con HTTPS.
 
+## Aprender y experimentar en la feria
+
+La pantalla inicial comienza en **Aprender paso a paso**. El ejemplo representa dos interruptores y una lámpara: debe encenderse cuando sus posiciones son diferentes (XOR). La guía propone cambiar una entrada, explorarla, seguir la señal por etapas, entrenar y probar una desconexión. Se puede avanzar manualmente o cambiar a **Explorar libremente**; los detalles de épocas, BCE, historial, fórmulas y pseudocódigo permanecen disponibles.
+
+Al tocar un elemento, su ficha 3D empieza por **Qué hace**. **Valores** permite inspeccionar y editar; **Código** muestra pseudocódigo equivalente a los cálculos actuales. Al abrirse en RA, la ficha elige un tamaño y una posición de lectura frente a la cámara, conserva su vínculo con el elemento y después permanece en ese lugar del espacio. Solo su orientación de lectura gira hacia la cámara; este ajuste no mueve la red ni el ancla.
+
+**Experimentar con la red**, en el panel lateral o en **Controles** durante la RA, incluye:
+
+- **Ver neurona por dentro:** muestra sus productos entrada × peso, suma, sesgo, función de activación y respuesta como objetos 3D con valores reales. El interior de una neurona intermedia tiene dos aportes; el de la salida, cuatro. **Cerrar interior** vuelve a la red completa.
+- **Desconectar selección:** aplica una máscara al cálculo conservando los parámetros. Una conexión o una entrada/neuronas intermedias se pueden cortar; la salida se conserva para observar la predicción. Si una conexión depende de una neurona cortada, primero hay que restaurar esa neurona. Entrenar no reconecta una pieza ni modifica los parámetros que su máscara mantiene inactivos.
+- **Restaurar antes del corte:** recupera el estado completo anterior a la primera intervención, incluido el historial. **Deshacer último cambio** permite volver a un punto anterior; una operación de entrenamiento iniciada con el botón también prepara su punto de retorno.
+- **Reto de reparación:** parte de una red entrenada durante 3000 rondas y altera su sesgo de salida en +6.5. Inicialmente resuelve tres de los cuatro ejemplos; reducir el sesgo o entrenar cambia de verdad las respuestas. La meta es recuperar los cuatro casos y reducir el error inicial del reto. Hay pistas y una solución restaurable.
+- **Un ejemplo incorrecto:** ambas redes parten de sus parámetros tras 3000 rondas de XOR y reinician a cero el contador de rondas nuevas. Ahora la etiqueta de `1,1` se cambia a `1`, aunque XOR exige `0`. Se distingue el conteo de etiquetas aprendidas del conteo contra la regla correcta. **Volver a mi red anterior** restaura exactamente el experimento inmediatamente anterior, con datos, historial, máscaras y modelo comparativo. Los datos XOR originales no se alteran. Se permiten hasta ocho experimentos anidados antes de volver o reiniciar.
+- **Comparar arquitecturas:** añade una red real sin capa oculta, con `sigmoide(w₁x₁ + w₂x₂ + b)`, los mismos ejemplos y rondas. La red principal continúa siendo la MLP 2–4–1 editable. Las intervenciones manuales se aplican a esta última, como indica el panel. Rebobinar el historial también recupera la evolución correspondiente de la comparación.
+- **Mapa de predicciones:** consulta cada modelo en una cuadrícula de dos entradas de 0 a 1. Azul representa salida hacia 0 y lima hacia 1; los puntos marcan los cuatro ejemplos XOR. Las zonas entre ejemplos son respuestas del modelo, no una medición de exactitud fuera de los ejemplos. La textura se recalcula al cambiar el modelo, no en cada frame.
+- **Modo expositor:** prepara una red inicial, entrenada o un reto. **Siguiente visitante** limpia el experimento, las intervenciones y los retornos, y vuelve al recorrido guiado. Estos botones no detienen ni recentran el seguimiento; el anclaje se conserva mientras siga siendo válido.
+
+Los cálculos de entrenamiento y de las intervenciones son reales para este pequeño modelo educativo. No se entrenan modelos industriales ni se analiza el contenido de la cámara para clasificar objetos. Esta entrega no incorpora proyección a otro monitor ni códigos QR.
+
+La comprensión por ingresantes y la legibilidad y fluidez de estas nuevas vistas en el Redmi requieren una prueba en el lugar de exposición. La revisión de escritorio y las pruebas de interfaz con un motor simulado no certifican el seguimiento físico.
+
 **Estado de validación:** el usuario confirmó que la RA de la versión anterior funciona bien en su Xiaomi Redmi Note 12S. La nueva interfaz de cámara a pantalla completa y las fichas 3D todavía necesitan una prueba física de legibilidad e interacción en ese teléfono. Los tests y la revisión en escritorio no sustituyen esa comprobación ni una evaluación de rendimiento y deriva con uso sostenido. El objetivo inicial es Chrome actualizado en Android. **Explorar 3D** sigue disponible como modo sin cámara.
 
 ## Usar la RA en Android

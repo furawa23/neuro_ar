@@ -2,6 +2,8 @@
 
 Aplicación educativa para Android y navegador: explora una red neuronal 2–4–1, inspecciona sus parámetros y observa cómo aprende. El modo **RA sin marcador** usa seguimiento del entorno con 8th Wall para colocar la red en un punto del espacio y acercarte a ella con el celular. La cámara ocupa toda la aplicación y la información de cada neurona o conexión aparece en una ficha WebGL 3D junto a la red. La carpeta principal es **[web/](web/README.md)** y genera archivos estáticos para GitHub Pages, Firebase Hosting o un VPS con HTTPS.
 
+El recorrido para principiantes utiliza interruptores y una lámpara para explicar XOR. Incluye guía por pasos, interior 3D de neuronas, desconexiones reversibles, reto de reparación, experimento con una etiqueta errónea, comparación con una red sin capa oculta, mapas de predicciones y modo expositor. Los valores, fórmulas, BCE, historial y pseudocódigo siguen disponibles. Consulta [los experimentos y sus controles](web/README.md#aprender-y-experimentar-en-la-feria).
+
 **Estado:** el usuario confirmó que la RA anterior funciona bien en su Xiaomi Redmi Note 12S. La nueva interfaz de cámara a pantalla completa y las fichas 3D requieren una prueba física de legibilidad e interacción; la compilación y las pruebas automatizadas no la sustituyen. El modo **Explorar 3D** permite usar el laboratorio sin cámara.
 
 ## Probar la realidad aumentada

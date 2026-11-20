@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SpatialInspector } from './spatial-inspector.js';
+import { SpatialLearning } from './spatial-learning.js';
 
 const NODE_DEFINITIONS = [
   { layer: 0, index: 0, name: 'x₁', spoken: 'Entrada 1', position: [-1.65, 0.5, 0] },
@@ -82,7 +83,7 @@ export class NetworkView {
     this.controls.dampingFactor = 0.08;
     this.controls.enablePan = false;
     this.controls.minDistance = 2.5;
-    this.controls.maxDistance = 16;
+    this.controls.maxDistance = 42;
     this.controls.minPolarAngle = 0.35;
     this.controls.maxPolarAngle = Math.PI - 0.35;
     this.scene.add(new THREE.HemisphereLight(0xf7ffff, 0x697c78, 2.2));
@@ -100,6 +101,8 @@ export class NetworkView {
     this.buildReticle();
     this.inspector = new SpatialInspector();
     this.content.add(this.inspector.root);
+    this.learning = new SpatialLearning(); this.content.add(this.learning.root);
+    this.signalStep = null;
     this.bindPointers();
     // Coalesce layout changes into the render loop. Resizing the canvas inside
     // a ResizeObserver delivery can trigger another layout notification.
@@ -238,9 +241,12 @@ export class NetworkView {
     if (!this.available) return;
     for (const node of this.nodes) {
       node.activation = node.layer === 0 ? snapshot.inputs[node.index] : node.layer === 1 ? snapshot.hiddenActivations[node.index] : snapshot.output;
+      node.enabled = network.isNeuronEnabled(node.layer, node.index);
+      node.material.opacity = node.enabled ? 1 : 0.25;
+      node.material.transparent = !node.enabled; node.material.depthWrite = node.enabled;
       const value = node.activation.toFixed(3);
       node.value.textContent = value;
-      const labelText = `${node.name}  ${value}`;
+      const labelText = `${node.name}  ${node.enabled ? value : 'cortada'}`;
       if (node.labelText !== labelText) {
         node.labelText = labelText;
         const ctx = node.labelCanvas.getContext('2d');
@@ -256,19 +262,20 @@ export class NetworkView {
     for (const connection of this.connections) {
       const { layer, target, source } = connection.selection;
       connection.weight = network.getWeight(layer, target, source);
+      connection.enabled = network.isConnectionEnabled(layer, target, source);
       this.styleConnection(connection);
     }
   }
 
   styleConnection(connection) {
     const selected = sameSelection(this.selection, connection.selection);
-    connection.material.color.set(selected ? COLORS.selected : connection.weight < 0 ? COLORS.negative : COLORS.positive);
-    connection.material.opacity = selected ? 1 : 0.68;
+    connection.material.color.set(connection.enabled === false ? 0x6c8181 : selected ? COLORS.selected : connection.weight < 0 ? COLORS.negative : COLORS.positive);
+    connection.material.opacity = connection.enabled === false ? 0.22 : selected ? 1 : 0.68;
     const radius = (0.009 + Math.min(Math.abs(connection.weight), 8) * 0.005) * (selected ? 1.45 : 1);
-    connection.solid.visible = connection.weight >= 0;
+    connection.solid.visible = connection.weight >= 0 && connection.enabled !== false;
     connection.solid.scale.set(radius, connection.length, radius);
     for (const dash of connection.dashes) {
-      dash.visible = connection.weight < 0;
+      dash.visible = connection.weight < 0 || connection.enabled === false;
       dash.scale.set(radius, connection.length / 9 * 0.57, radius);
     }
   }
@@ -289,14 +296,31 @@ export class NetworkView {
     if (this.isArMode && (!this.placed || !this.anchor.visible)) return false;
     this.select(selection);
     this.onSelect?.(selection);
-    const point = selection.kind === 'neuron'
-      ? this.nodes.find(node => sameSelection(selection, node.selection))?.mesh.position
-      : this.connections.find(connection => sameSelection(selection, connection.selection))?.group.position;
-    if (point) this.inspector.openAt(point, this.isArMode);
+    const point = this.nodes.find(node => node.layer === selection.layer && node.index === (selection.kind === 'neuron' ? selection.index : selection.target))?.mesh.position;
+    if (point) {
+      this.inspector.openAt(point, this.isArMode);
+      if (this.isArMode) this.inspector.fitForReading(this.camera);
+    }
     return true;
   }
 
   setInspectorData(data) { this.inspector?.setData(data); }
+
+  setLearningData(data) {
+    if (!this.learning) return;
+    const selection = this.selection;
+    const point = this.nodes.find(node => node.layer === selection.layer && node.index === (selection.kind === 'neuron' ? selection.index : selection.target))?.mesh.position;
+    this.learningData = data;
+    this.learning.update({ ...data, point: point ?? new THREE.Vector3() });
+    if (data.inside) this.inspector.close();
+    const layout = `${Boolean(data.inside)}-${Boolean(data.compare)}-${Boolean(data.map)}`;
+    if (layout !== this.learningLayout && !this.isArMode) this.resetView();
+    this.learningLayout = layout;
+  }
+
+  setSignalStep(step) { this.signalStep = step; }
+
+  closeLearning() { this.inspector?.close(); this.learning?.close(); }
 
   pulse() { this.pulseStarted = performance.now() / 1000; }
 
@@ -310,6 +334,7 @@ export class NetworkView {
     this.anchor.visible = false;
     this.placed = false;
     this.inspector.close();
+    this.learning.close();
     if (this.reticle) this.reticle.visible = false;
     if (enabled) {
       this.anchor.add(this.content);
@@ -329,6 +354,7 @@ export class NetworkView {
   setPlacementState(placed) {
     this.placed = Boolean(placed);
     if (!this.placed) this.inspector?.close();
+    if (!this.placed) this.learning?.close();
     if (!this.placed) this.anchor.visible = false;
     if (this.reticle && this.placed) this.reticle.visible = false;
   }
@@ -367,6 +393,18 @@ export class NetworkView {
   resetView() {
     if (!this.renderer) return;
     const aspect = Math.max(0.2, this.previewCamera.aspect);
+    const teaching = this.learningData;
+    if (teaching?.inside || teaching?.compare || teaching?.map) {
+      const focused = teaching.inside && !teaching.compare && !teaching.map;
+      const left = teaching.inside ? Math.min(-2.3, this.learning.inside.position.x - 3.6) : -2.3;
+      const right = Math.max(teaching.compare ? 6.2 : 2.3, teaching.inside ? this.learning.inside.position.x + 3.3 : 2.3);
+      const bottom = focused ? this.learning.inside.position.y - 1.8 : teaching.map ? -4.6 : teaching.compare ? -2.4 : -1.8;
+      const top = teaching.inside ? this.learning.inside.position.y + 2.6 : teaching.compare ? 2.8 : 1.8;
+      const distance = Math.max((right - left) / aspect, top - bottom) * 0.58 / Math.tan(THREE.MathUtils.degToRad(20));
+      this.controls.target.set((left + right) / 2, (top + bottom) / 2, 0);
+      this.previewCamera.position.copy(this.controls.target).add(new THREE.Vector3(0.1, 0.05, distance));
+      this.controls.update(); return;
+    }
     const distance = Math.max(1.65, 2.25 / aspect) / Math.tan(THREE.MathUtils.degToRad(20));
     this.previewCamera.position.set(distance * 0.04, distance * 0.025, distance);
     this.controls.target.set(0, 0.14, 0);
@@ -439,10 +477,13 @@ export class NetworkView {
       this.direction.set(this.pointer.x, this.pointer.y, 0.5).unproject(this.arCamera).sub(origin).normalize();
       this.raycaster.set(origin, this.direction);
     } else this.raycaster.setFromCamera(this.pointer, this.previewCamera);
+    this.raycaster.camera = this.camera;
+    const learningHit = this.learning.hitTest(this.raycaster);
+    if (learningHit) { this.onInspectorAction?.(learningHit); return true; }
     const cardHit = this.inspector.hitTest(this.raycaster);
     if (cardHit) {
       this.inspector.activate(cardHit.action);
-      if (cardHit.action === 'increase' || cardHit.action === 'decrease') this.onInspectorAction?.(cardHit.action);
+      if (['close', 'increase', 'decrease', 'open-neuron', 'toggle-connection'].includes(cardHit.action)) this.onInspectorAction?.(cardHit.action);
       return true;
     }
     this.raycaster.camera = this.camera;
@@ -481,15 +522,21 @@ export class NetworkView {
     const pulseAge = milliseconds / 1000 - this.pulseStarted;
     for (const node of this.nodes) {
       const arrival = node.layer * 0.52;
-      const glow = Math.max(0, 1 - Math.abs(pulseAge - arrival - 0.16) / 0.24);
+      const glow = node.enabled === false ? 0 : this.signalStep === null
+        ? Math.max(0, 1 - Math.abs(pulseAge - arrival - 0.16) / 0.24)
+        : Number((this.signalStep === 0 && node.layer === 0) || (this.signalStep === 2 && node.layer === 1) || (this.signalStep === 4 && node.layer === 2));
       node.material.emissiveIntensity = 0.1 + Math.abs(node.activation) * 0.13 + glow * 1.5;
       node.mesh.scale.setScalar(1 + glow * 0.18);
+    }
+    for (const connection of this.connections) if (this.signalStep !== null && connection.enabled !== false) {
+      connection.material.opacity = this.signalStep === (connection.selection.layer === 1 ? 1 : 3) ? 1 : 0.22;
     }
     this.scene.updateMatrixWorld(true);
     this.camera.updateMatrixWorld(true);
     this.inspector.faceCamera(this.camera);
+    this.learning.faceCamera(this.camera);
     const visible = !this.isArMode || (this.placed && this.anchor.visible);
-    const spatialLabels = this.isArMode || this.inspector.root.visible;
+    const spatialLabels = this.isArMode || this.inspector.root.visible || this.learning.inside.visible || this.learning.maps.visible || this.learning.comparison.visible;
     for (const node of this.nodes) {
       node.sprite.visible = spatialLabels;
       this.point.copy(node.mesh.position);
@@ -528,6 +575,7 @@ export class NetworkView {
       for (const material of this.materials) material.dispose();
       for (const texture of this.textures) texture.dispose();
       this.inspector?.dispose();
+      this.learning?.dispose();
       this.renderer.dispose();
       canvas.remove();
     }

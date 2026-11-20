@@ -101,7 +101,9 @@ export class NetworkView {
     this.inspector = new SpatialInspector();
     this.content.add(this.inspector.root);
     this.bindPointers();
-    this.resizeObserver = new ResizeObserver(() => this.resize());
+    // Coalesce layout changes into the render loop. Resizing the canvas inside
+    // a ResizeObserver delivery can trigger another layout notification.
+    this.resizeObserver = new ResizeObserver(() => { this.resizePending = true; });
     this.resizeObserver.observe(stage);
     this.resize();
     this.resetView();
@@ -453,6 +455,7 @@ export class NetworkView {
 
   animate(milliseconds) {
     if (this.disposed) return;
+    if (this.resizePending) { this.resizePending = false; this.resize(); }
     const seconds = milliseconds / 1000;
     try { this.onFrame?.(seconds); }
     catch (error) {

@@ -31,7 +31,8 @@ test('counts and pose age reject nonfinite, negative, fractional and nonnumeric 
   });
   assert.match(output.target, /Sin puntos válidos/);
   assert.match(output.copyText, /puntos_3d: 0\nsuperficies_estimadas: 0\nsuperficies_detectadas: 0/);
-  assert.match(output.copyText, /objetivos_validos: 0\nedad_pose_ms: sin dato$/);
+  assert.match(output.copyText, /objetivos_validos: 0\n/);
+  assert.match(output.copyText, /edad_pose_ms: sin dato$/);
   assert.doesNotMatch(output.copyText, /NaN|Infinity/);
   for (const value of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, '2', null, undefined]) {
     assert.match(formatDiagnostics({ validTargets: value }).copyText, /objetivos_validos: 0/);
@@ -48,13 +49,25 @@ test('diagnostic copy is deterministic, versioned and excludes arbitrary scene o
   };
   const output = formatDiagnostics(packet);
   assert.equal(output.copyText, formatDiagnostics({ ...packet }).copyText);
-  assert.match(output.copyText, /^NeuroAR · diagnóstico local\nrevision: puntos3d-1\n/);
+  assert.match(output.copyText, /^NeuroAR · diagnóstico local\nrevision: puntos3d-2\n/);
   assert.match(output.copyText, /puntos_3d: 6/);
   assert.equal(output.target, '2 puntos válidos');
   assert.doesNotMatch(output.copyText, /private|secret|https|8\.18|9\.19|rotation|images|position/);
   const hostile = formatDiagnostics({ state: packet.reason, video: packet.reason, engineTrackingStatus: packet.reason, engineTrackingReason: packet.reason, rejection: packet.reason, hitCounts: { [packet.reason]: 25 } });
   assert.doesNotMatch(hostile.copyText, /private|secret|https/);
   assert.match(hostile.copyText, /estado: unknown/);
+});
+
+test('invalid hit diagnostics identify validation failures without copying arbitrary metadata', () => {
+  const output = formatDiagnostics({ state: 'no-target', rejection: 'invalid-hit',
+    hitRejections: { position: 5, distance: 2, rotation: 1, private: 'secret' } });
+  assert.equal(output.reason, 'Resultados rechazados: posición 5, distancia 2, orientación 1.');
+  assert.match(output.copyText, /rechazos_posicion: 5\nrechazos_distancia: 2\nrechazos_orientacion: 1/);
+  assert.doesNotMatch(output.copyText, /private|secret/);
+  const malformed = formatDiagnostics({ rejection: 'invalid-hit',
+    hitRejections: { position: Infinity, distance: -1, rotation: 'private' } });
+  assert.equal(malformed.reason, 'Resultados rechazados: posición 0, distancia 0, orientación 0.');
+  assert.doesNotMatch(malformed.copyText, /Infinity|private/);
 });
 
 test('missing packets and incomplete states have safe text without claiming physical tracking', () => {

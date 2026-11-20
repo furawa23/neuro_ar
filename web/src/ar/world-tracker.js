@@ -1,4 +1,5 @@
 import { Matrix4 } from 'three';
+import { normalizeHitTarget } from './hit-target.js';
 
 const STALE_POSE_MS = 350;
 const VIDEO_TIMEOUT_MS = 5000;
@@ -120,6 +121,7 @@ export class WorldTracker {
       settled: false, lastPose: -Infinity, lastVideoTime: -1,
       lastVideoFrame: this._clock(), projectionSize: '', reticle: null,
       lastScan: -Infinity, hitCounts: {}, validTargets: 0, rawHits: 0,
+      hitRejections: {},
       engineTrackingStatus: null, engineTrackingReason: null, lastDiagnosticAt: -Infinity,
     };
     session.ready = new Promise((resolve, reject) => { session.resolve = resolve; session.reject = reject; });
@@ -329,9 +331,12 @@ export class WorldTracker {
       const type = typeof hit?.type === 'string' && TARGET_TYPES.has(hit.type) ? hit.type : 'UNSPECIFIED';
       session.hitCounts[type] = (session.hitCounts[type] ?? 0) + 1;
     }
-    const surfaces = hits.filter(hit => hit && TARGET_TYPES.has(hit.type)
-      && finiteVector(hit.position) && finiteRotation(hit.rotation)
-      && Number.isFinite(hit.distance) && hit.distance > 0 && hit.distance < 15);
+    const surfaces = [];
+    for (const hit of hits) {
+      const result = normalizeHitTarget(hit, this.camera.position);
+      if (result.target) surfaces.push(result.target);
+      else if (collect) session.hitRejections[result.rejection] = (session.hitRejections[result.rejection] ?? 0) + 1;
+    }
     surfaces.sort((a, b) => Number(!SURFACE_TYPES.has(a.type)) - Number(!SURFACE_TYPES.has(b.type)) || a.distance - b.distance);
     const hit = surfaces[0];
     return hit ? { type: hit.type, position: { ...hit.position }, rotation: { ...hit.rotation }, distance: hit.distance,
@@ -339,7 +344,7 @@ export class WorldTracker {
   }
 
   _scanTargets(session) {
-    session.hitCounts = {}; session.rawHits = 0;
+    session.hitCounts = {}; session.hitRejections = {}; session.rawHits = 0;
     const targets = TARGET_SAMPLES.map(([x, y]) => this._surfaceAt(session, x, y, true)).filter(Boolean);
     targets.sort((a, b) => Number(!SURFACE_TYPES.has(a.type)) - Number(!SURFACE_TYPES.has(b.type))
       || Math.hypot(a.screen.x - 0.5, a.screen.y - 0.5) - Math.hypot(b.screen.x - 0.5, b.screen.y - 0.5));
@@ -423,6 +428,7 @@ export class WorldTracker {
     session.reticle = null;
     session.validTargets = 0;
     session.hitCounts = {};
+    session.hitRejections = {};
     session.rawHits = 0;
     session.lastScan = -Infinity;
     this.onReticle(null);
@@ -445,6 +451,7 @@ export class WorldTracker {
     this.onDiagnostics({
       state, reason: session.engineTrackingReason, video: cameraState,
       hitCounts: { ...session.hitCounts }, validTargets: session.validTargets,
+      hitRejections: { ...session.hitRejections },
       lastPoseAgeMs: Number.isFinite(session.lastPose) ? Math.max(0, now - session.lastPose) : null,
       engineTrackingStatus: session.engineTrackingStatus,
       engineTrackingReason: session.engineTrackingReason,

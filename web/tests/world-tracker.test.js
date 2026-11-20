@@ -160,7 +160,8 @@ test('unknown targets, invalid hits and untracked states cannot place', async ()
     fixture.emit();
     for (const hits of [[], [surface({ type: 'UNSPECIFIED' })],
       [surface({ position: { x: NaN, y: 0, z: -1 } })], [surface({ rotation: { x: 0, y: 0, z: 0, w: 0 } })],
-      [surface({ distance: -1 })], [surface({ distance: Infinity })]]) {
+      [surface({ position: { x: 0, y: 1.5, z: 0 } })],
+      [surface({ position: { x: 0, y: 1.5, z: -20 } })]]) {
       fixture.engine.hits = hits;
       assert.equal(fixture.tracker.placeAt(0.5, 0.5), false);
       assert.equal(fixture.anchor.visible, false);
@@ -399,7 +400,9 @@ test('SDK render callback observes the updated camera pose and ignores stale ses
 
 test('documented FEATURE_POINT query places the displayed off-centre 3D point without a plane', async () => {
   const fixture = createFixture();
-  const point = surface({ type: 'FEATURE_POINT', position: { x: 0.6, y: 0.8, z: -1.2 } });
+  // A world point needs a position, not a measured surface orientation or
+  // redundant distance metadata. This was rejected by the old surface filter.
+  const point = { type: 'FEATURE_POINT', position: { x: 0.6, y: 0.8, z: -1.2 } };
   fixture.engine.hits = (x, y, includedTypes) => {
     assert.deepEqual(includedTypes, ['FEATURE_POINT']);
     return x === 0.65 && y === 0.5 ? [point] : [];
@@ -414,8 +417,39 @@ test('documented FEATURE_POINT query places the displayed off-centre 3D point wi
     assert.equal(fixture.tracker.placeAt(), true, 'the button uses the real, recent displayed result');
     assert.equal(fixture.engine.hitCalls.length, calls, 'it must not incorrectly query the empty centre');
     assert.deepEqual(fixture.anchor.position.toArray(), [0.6, 0.8, -1.2]);
+    const fixedRotation = fixture.anchor.quaternion.toArray();
     fixture.emit({ position: { x: 1, y: 1.2, z: -0.5 } });
     assert.deepEqual(fixture.anchor.position.toArray(), [0.6, 0.8, -1.2], 'a camera move cannot drag the point');
+    assert.deepEqual(fixture.anchor.quaternion.toArray(), fixedRotation, 'the model must not turn toward the moving camera');
+  } finally { fixture.tracker.dispose(); }
+});
+
+test('five rejected SDK points report the failing field and recover when real positions arrive', async () => {
+  const fixture = createFixture();
+  try {
+    await fixture.tracker.start();
+    fixture.engine.hits = [{ type: 'FEATURE_POINT', position: null }];
+    fixture.setTime(1600); fixture.emit();
+    const invalid = fixture.callbacks.diagnostics.at(-1);
+    assert.equal(invalid.state, 'no-target');
+    assert.equal(invalid.video, 'live');
+    assert.equal(invalid.engineTrackingStatus, 'NORMAL');
+    assert.equal(invalid.rejection, 'invalid-hit');
+    assert.equal(invalid.hitCounts.FEATURE_POINT, 5);
+    assert.deepEqual(invalid.hitRejections, { position: 5 });
+    assert.equal(fixture.tracker.placeAt(), false);
+    assert.equal(fixture.anchor.visible, false, 'missing SDK positions never produce a fallback location');
+
+    fixture.engine.hits = [{ type: 'FEATURE_POINT', position: new Float32Array([0.5, 0.75, -1]),
+      distance: 0, rotation: { x: 0, y: 0, z: 0, w: 0 } }];
+    fixture.setTime(2200); fixture.emit();
+    const valid = fixture.callbacks.diagnostics.at(-1);
+    assert.equal(valid.state, 'target');
+    assert.equal(valid.validTargets, 5);
+    assert.deepEqual(valid.hitRejections, {});
+    assert.deepEqual(invalid.hitRejections, { position: 5 }, 'old diagnostic snapshots remain independent');
+    assert.equal(fixture.tracker.placeAt(), true);
+    assert.deepEqual(fixture.anchor.position.toArray(), [0.5, 0.75, -1]);
   } finally { fixture.tracker.dispose(); }
 });
 

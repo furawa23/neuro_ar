@@ -26,6 +26,7 @@ export function formatDiagnostics(packet) {
   const estimated = count(hits.ESTIMATED_SURFACE);
   const detected = count(hits.DETECTED_SURFACE);
   const validTargets = count(data.validTargets);
+  const rejected = data.hitRejections && typeof data.hitRejections === 'object' ? data.hitRejections : {};
   const age = typeof data.lastPoseAgeMs === 'number' && Number.isFinite(data.lastPoseAgeMs)
     && data.lastPoseAgeMs >= 0 && data.lastPoseAgeMs <= Number.MAX_SAFE_INTEGER
     ? Math.floor(data.lastPoseAgeMs) : null;
@@ -62,7 +63,7 @@ export function formatDiagnostics(packet) {
   else if (state === 'initializing' || engineReason === 'INITIALIZING') reason = 'El motor todavía está reconociendo el movimiento y el entorno.';
   else if (state === 'limited' || rejection === 'tracking-limited') reason = 'El motor informa de seguimiento limitado; mueve el teléfono lentamente sobre una zona con detalles.';
   else if (rejection === 'no-reality') reason = 'La cámara puede estar activa, pero aún no hay datos de posición del motor.';
-  else if (rejection === 'invalid-hit') reason = 'Se recibieron puntos, pero sus datos no permiten una colocación válida.';
+  else if (rejection === 'invalid-hit') reason = `Resultados rechazados: posición ${count(rejected.position)}, distancia ${count(rejected.distance)}, orientación ${count(rejected.rotation)}.`;
   else if (state === 'no-target' || rejection === 'no-hits') reason = 'Hay seguimiento de movimiento, pero aún no hay puntos válidos en la zona apuntada.';
   else if (state === 'target' && validTargets > 0) reason = 'El motor ofrece un punto para colocar; la estabilidad física debe comprobarse en el teléfono.';
   else if (state === 'placed') reason = 'El motor conserva una colocación; verifica su estabilidad al moverte alrededor.';
@@ -70,7 +71,7 @@ export function formatDiagnostics(packet) {
 
   const copyText = [
     'NeuroAR · diagnóstico local',
-    'revision: puntos3d-1',
+    'revision: puntos3d-2',
     `estado: ${state}`,
     `camara: ${video}`,
     `seguimiento_sdk: ${engineStatus}`,
@@ -80,6 +81,9 @@ export function formatDiagnostics(packet) {
     `superficies_estimadas: ${estimated}`,
     `superficies_detectadas: ${detected}`,
     `objetivos_validos: ${validTargets}`,
+    `rechazos_posicion: ${count(rejected.position)}`,
+    `rechazos_distancia: ${count(rejected.distance)}`,
+    `rechazos_orientacion: ${count(rejected.rotation)}`,
     `edad_pose_ms: ${age ?? 'sin dato'}`,
   ].join('\n');
 

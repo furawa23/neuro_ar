@@ -4,7 +4,7 @@ Laboratorio educativo para explorar una red neuronal en 3D, inspeccionar sus par
 
 `web/` es independiente del proyecto Unity de la raíz. Su compilación produce archivos estáticos para GitHub Pages, Firebase Hosting o un VPS con HTTPS.
 
-**Estado de validación:** la cámara, el seguimiento espacial, la colocación y el rendimiento del Xiaomi Redmi Note 12S siguen pendientes de prueba física. El objetivo inicial es Chrome actualizado en Android. Los tests matemáticos, la compilación y la revisión en escritorio no certifican que la RA funcione en un dispositivo concreto. **Explorar 3D** sigue disponible como modo sin cámara.
+**Estado de validación:** un diagnóstico enviado desde el Xiaomi Redmi Note 12S confirma cámara activa, seguimiento `NORMAL` y resultados de puntos 3D. La colocación, su estabilidad al caminar y el rendimiento siguen pendientes de prueba física. El objetivo inicial es Chrome actualizado en Android. Los tests matemáticos, la compilación y la revisión en escritorio no certifican el anclaje físico. **Explorar 3D** sigue disponible como modo sin cámara.
 
 ## Usar la RA en Android
 
@@ -24,6 +24,8 @@ No se necesita un marcador impreso. La posición y el tamaño de la red son apro
 Abre **Estado de RA** debajo de la cámara. Distingue cámara detenida o congelada, movimiento todavía inicializando, seguimiento limitado y seguimiento activo sin puntos. **Copiar estado** genera un resumen local para soporte; no incluye imágenes, coordenadas, orientación ni datos personales y no se envía automáticamente.
 
 El adaptador solicita `hitTest(x, y, ['FEATURE_POINT'])`, tal como documenta la [API oficial](https://8thwall.org/docs/api/engine/xrcontroller/hittest). Conserva las estimaciones de superficie válidas y permite usar un punto 3D válido como anclaje con seguimiento normal. La versión anterior descartaba `FEATURE_POINT`, esperando solo tipos de superficie que el motor no garantiza devolver.
+
+La revisión `puntos3d-2` valida la posición real del punto y calcula su distancia desde la cámara, sin exigir orientación de superficie a un `FEATURE_POINT`. La red queda vertical, orientada hacia la cámara al colocarla; esa orientación permanece fija al caminar. Las superficies conservan su orientación del SDK. No se generan posiciones alternativas si faltan coordenadas válidas. El resumen distingue rechazos por posición, distancia u orientación para precisar cualquier fallo restante; los límites de distancia se expresan en unidades relativas del seguimiento, no en metros.
 
 ## Requisitos y permisos
 

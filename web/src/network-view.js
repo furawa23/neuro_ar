@@ -196,12 +196,19 @@ export class NetworkView {
       opacity: 0.95,
       depthWrite: false,
     }));
+    this.reticleSurface = new THREE.Group();
+    this.reticle.add(this.reticleSurface);
     const ring = new THREE.Mesh(this.geometry(new THREE.RingGeometry(0.055, 0.065, 48)), material);
     ring.rotation.x = -Math.PI / 2;
-    this.reticle.add(ring);
+    this.reticleSurface.add(ring);
     const center = new THREE.Mesh(this.geometry(new THREE.CircleGeometry(0.009, 24)), material);
     center.rotation.x = -Math.PI / 2;
-    this.reticle.add(center);
+    this.reticleSurface.add(center);
+    this.reticlePoint = new THREE.Mesh(this.geometry(new THREE.SphereGeometry(0.028, 12, 8)),
+      this.material(new THREE.MeshBasicMaterial({ color: COLORS.selected, wireframe: true,
+        transparent: true, opacity: 0.95, depthWrite: false })));
+    this.reticlePoint.visible = false;
+    this.reticle.add(this.reticlePoint);
   }
 
   geometry(value) { this.geometries.add(value); return value; }
@@ -288,7 +295,7 @@ export class NetworkView {
     if (this.reticle && this.placed) this.reticle.visible = false;
   }
 
-  /** Show a measured surface hit in world space, independently of the hidden model anchor. */
+  /** Surface hits use a ring; tracked feature points use a spatial dot. */
   setReticle(pose) {
     if (!this.reticle) return;
     const position = pose?.position;
@@ -297,6 +304,9 @@ export class NetworkView {
       return;
     }
     this.reticle.position.set(position.x, position.y, position.z);
+    const point = pose.type === 'FEATURE_POINT';
+    this.reticlePoint.visible = point;
+    this.reticleSurface.visible = !point;
     const rotation = pose.rotation;
     if (rotation && [rotation.x, rotation.y, rotation.z, rotation.w].every(Number.isFinite) && Math.hypot(rotation.x, rotation.y, rotation.z, rotation.w) > 0) {
       this.reticle.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w).normalize();

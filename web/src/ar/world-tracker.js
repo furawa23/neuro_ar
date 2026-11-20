@@ -4,6 +4,9 @@ const STALE_POSE_MS = 350;
 const VIDEO_TIMEOUT_MS = 5000;
 const STARTUP_TIMEOUT_MS = 90000;
 const SURFACE_TYPES = new Set(['DETECTED_SURFACE', 'ESTIMATED_SURFACE']);
+const TARGET_TYPES = new Set([...SURFACE_TYPES, 'FEATURE_POINT']);
+const TARGET_SCAN_MS = 125;
+const TARGET_SAMPLES = [[0.5, 0.5], [0.35, 0.5], [0.65, 0.5], [0.5, 0.65], [0.5, 0.8]];
 let enginePromise;
 
 /** Load the original, self-hosted SDK. Its binary is neither modified nor inspected. */
@@ -70,7 +73,7 @@ function closeStream(stream) {
  */
 export class WorldTracker {
   constructor({ renderer, camera, anchor, onStatus = () => {}, onTracking = () => {},
-    onPlacement = () => {}, onReticle = () => {}, onStop = () => {}, onRender = () => {},
+    onPlacement = () => {}, onReticle = () => {}, onStop = () => {}, onRender = () => {}, onDiagnostics = () => {},
     engineLoader = loadWorldEngine, clock = () => performance.now(), platform = globalThis }) {
     this.renderer = renderer;
     this.camera = camera;
@@ -82,6 +85,7 @@ export class WorldTracker {
     this.onReticle = onReticle;
     this.onStop = onStop;
     this.onRender = onRender;
+    this.onDiagnostics = onDiagnostics;
     this._loadEngine = engineLoader;
     this._clock = clock;
     this._platform = platform;
@@ -115,6 +119,8 @@ export class WorldTracker {
       video: null, observer: null, started: false, ownsEngine: false,
       settled: false, lastPose: -Infinity, lastVideoTime: -1,
       lastVideoFrame: this._clock(), projectionSize: '', reticle: null,
+      lastScan: -Infinity, hitCounts: {}, validTargets: 0, rawHits: 0,
+      engineTrackingStatus: null, engineTrackingReason: null, lastDiagnosticAt: -Infinity,
     };
     session.ready = new Promise((resolve, reject) => { session.resolve = resolve; session.reject = reject; });
     this._session = session;
@@ -123,6 +129,7 @@ export class WorldTracker {
     this._setPlaced(false);
     this.onReticle(null);
     this._status('Preparando seguimiento espacial. La primera carga puede tardar…');
+    this._diagnostic(session, 'loading', null, true);
     session.timeout = setTimeout(() => this._fail(session,
       new Error('La RA tardó demasiado en iniciar. Revisa la conexión, la cámara y los permisos de movimiento.')), STARTUP_TIMEOUT_MS);
     void this._start(session);
@@ -155,10 +162,10 @@ export class WorldTracker {
         session.observer = new Observer(() => this._resize(session));
         session.observer.observe(this.stage);
       }
-      // Absolute scale requests metres from SLAM. No camera-only or simulated
-      // fallback is substituted when tracking is unavailable.
+      // Educational content needs consistent relative 6DoF, not a metric scale
+      // estimate. Responsive is the SDK default; it does not disable SLAM.
       engine.XrController.configure({ disableWorldTracking: false, enableLighting: false,
-        enableWorldPoints: false, scale: 'absolute' });
+        enableWorldPoints: false, scale: 'responsive' });
       const module = this._pipeline(session);
       session.ownsEngine = true;
       engine.clearCameraPipelineModules();
@@ -168,6 +175,7 @@ export class WorldTracker {
         module,
       ]);
       this._status('Permite la cámara y los sensores de movimiento cuando el navegador lo solicite.');
+      this._diagnostic(session, 'camera', null, true);
       engine.run({ canvas, ownRunLoop: true,
         cameraConfig: { direction: engine.XrConfig.camera().BACK },
         // ANY allows a desktop 3D fallback in 8th Wall. Requiring MOBILE avoids
@@ -189,7 +197,8 @@ export class WorldTracker {
         this._active = true;
         this._syncProjection(session, canvasWidth, canvasHeight, true);
         this._settle(session, true);
-        this._status('Mueve el teléfono despacio para reconocer una superficie con textura.');
+        this._status('Reconociendo movimiento. Desplaza el teléfono lentamente de lado frente a una zona con detalles.');
+        this._diagnostic(session, 'initializing', 'no-reality', true);
       },
       onCanvasSizeChange: ({ canvasWidth, canvasHeight }) => {
         if (this._current(session)) this._syncProjection(session, canvasWidth, canvasHeight);
@@ -265,19 +274,24 @@ export class WorldTracker {
     if (!session.started || !this._active) return;
     const now = this._clock();
     const projection = reality?.intrinsics;
+    session.engineTrackingStatus = reality?.trackingStatus ?? null;
+    session.engineTrackingReason = reality?.trackingReason ?? null;
     // Camera delivery and SLAM confidence are independent. Initialization can
     // remain LIMITED for several seconds while new video frames keep arriving.
     const videoFresh = this._videoFresh(session, now);
-    if (reality?.trackingStatus !== 'NORMAL' || reality?.trackingReason === 'INITIALIZING'
-      || !finiteVector(reality?.position) || !finiteRotation(reality?.rotation)
-      || projection?.length !== 16 || !Array.from(projection).every(Number.isFinite)
-      || !videoFresh) {
-      this._loseTracking(session);
-      return;
+    if (!videoFresh) { this._loseTracking(session, 'stale-video'); return; }
+    if (!reality || reality.trackingStatus !== 'NORMAL' || reality.trackingReason === 'INITIALIZING') {
+      this._loseTracking(session, reality ? 'tracking-limited' : 'no-reality'); return;
+    }
+    if (!finiteVector(reality.position) || !finiteRotation(reality.rotation)) {
+      this._loseTracking(session, 'invalid-pose'); return;
+    }
+    if (projection?.length !== 16 || !Array.from(projection).every(Number.isFinite)) {
+      this._loseTracking(session, 'invalid-projection'); return;
     }
     this._projection.fromArray(projection);
     const determinant = this._projection.determinant();
-    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-12) { this._loseTracking(session); return; }
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-12) { this._loseTracking(session, 'invalid-projection'); return; }
     this.camera.matrixAutoUpdate = true;
     this.camera.position.copy(reality.position);
     this.camera.quaternion.copy(reality.rotation).normalize();
@@ -290,37 +304,63 @@ export class WorldTracker {
     this.anchor.visible = this._placed;
     if (this._placed) {
       this._status('Red colocada. Puedes acercarte y moverte alrededor mientras haya seguimiento.');
+      this._diagnostic(session, 'placed');
     } else {
-      session.reticle = this._surfaceAt(session, 0.5, 0.5);
-      this.onReticle(session.reticle);
-      this._status(session.reticle ? 'Superficie encontrada. Toca para colocar la red.'
-        : 'Busca una superficie con textura y buena luz; mueve el teléfono despacio.');
+      if (now - session.lastScan >= TARGET_SCAN_MS) this._scanTargets(session);
+      const target = session.reticle;
+      this._status(target ? target.type === 'FEATURE_POINT'
+        ? 'Punto 3D del entorno encontrado. Pulsa Colocar o toca otro punto.'
+        : 'Superficie estimada encontrada. Pulsa Colocar para fijar la red.'
+        : 'Movimiento reconocido. Buscando puntos del entorno; desplaza el teléfono lentamente de lado.');
+      this._diagnostic(session, target ? 'target' : 'no-target', target ? null : session.rawHits ? 'invalid-hit' : 'no-hits');
     }
   }
 
-  _surfaceAt(session, x, y) {
+  _surfaceAt(session, x, y, collect = false) {
     if (!this._current(session) || !this._tracking || this._clock() - session.lastPose > STALE_POSE_MS) return null;
-    // No fabricated y=0 plane and no unsupported inclusion-filter values. The
-    // SDK's default hitTest returns typed estimates; accept only surfaces.
+    // FEATURE_POINT is the documented request filter. A tracked point is a
+    // valid world anchor even when the SDK has not reported a whole plane.
     let hits;
-    try { hits = session.engine.XrController.hitTest(x, y) ?? []; }
+    try { hits = session.engine.XrController.hitTest(x, y, ['FEATURE_POINT']) ?? []; }
     catch { return null; }
     if (!Array.isArray(hits)) return null;
-    const surfaces = hits.filter(hit => SURFACE_TYPES.has(hit.type)
+    if (collect) for (const hit of hits) {
+      session.rawHits++;
+      const type = typeof hit?.type === 'string' && TARGET_TYPES.has(hit.type) ? hit.type : 'UNSPECIFIED';
+      session.hitCounts[type] = (session.hitCounts[type] ?? 0) + 1;
+    }
+    const surfaces = hits.filter(hit => hit && TARGET_TYPES.has(hit.type)
       && finiteVector(hit.position) && finiteRotation(hit.rotation)
       && Number.isFinite(hit.distance) && hit.distance > 0 && hit.distance < 15);
-    surfaces.sort((a, b) => a.distance - b.distance);
+    surfaces.sort((a, b) => Number(!SURFACE_TYPES.has(a.type)) - Number(!SURFACE_TYPES.has(b.type)) || a.distance - b.distance);
     const hit = surfaces[0];
-    return hit ? { type: hit.type, position: { ...hit.position }, rotation: { ...hit.rotation }, distance: hit.distance } : null;
+    return hit ? { type: hit.type, position: { ...hit.position }, rotation: { ...hit.rotation }, distance: hit.distance,
+      screen: { x, y }, observedAt: this._clock() } : null;
   }
 
-  placeAt(x = 0.5, y = 0.5) {
+  _scanTargets(session) {
+    session.hitCounts = {}; session.rawHits = 0;
+    const targets = TARGET_SAMPLES.map(([x, y]) => this._surfaceAt(session, x, y, true)).filter(Boolean);
+    targets.sort((a, b) => Number(!SURFACE_TYPES.has(a.type)) - Number(!SURFACE_TYPES.has(b.type))
+      || Math.hypot(a.screen.x - 0.5, a.screen.y - 0.5) - Math.hypot(b.screen.x - 0.5, b.screen.y - 0.5));
+    session.validTargets = targets.length;
+    session.lastScan = this._clock();
+    session.reticle = targets[0] ?? null;
+    this.onReticle(session.reticle);
+  }
+
+  placeAt(x, y) {
     const session = this._session;
-    if (!session || this._placed || !this._active || !Number.isFinite(x) || !Number.isFinite(y)
-      || x < 0 || x > 1 || y < 0 || y > 1) return false;
-    const hit = this._surfaceAt(session, x, y);
+    if (!session || this._placed || !this._active || !this._tracking
+      || this._clock() - session.lastPose > STALE_POSE_MS) return false;
+    const cached = x === undefined && y === undefined;
+    if (!cached && (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1)) return false;
+    // The button must place the point actually displayed, including off-centre
+    // samples. Expired results are never used to invent a fresh placement.
+    let hit = cached ? session.reticle : this._surfaceAt(session, x, y);
+    if (cached && hit && this._clock() - hit.observedAt > STALE_POSE_MS) hit = null;
     if (!hit || !this._current(session)) {
-      this._status('Aún no hay una superficie estable en ese punto. Muévete despacio y vuelve a tocar.');
+      this._status('Aún no hay un punto 3D válido ahí. Desplaza el teléfono lentamente y espera al indicador.');
       return false;
     }
     this.anchor.matrixAutoUpdate = true;
@@ -333,6 +373,7 @@ export class WorldTracker {
     session.reticle = null;
     this.onReticle(null);
     this._status('Red colocada. Acércate o muévete alrededor para explorarla.');
+    this._diagnostic(session, 'placed', null, true);
     return true;
   }
 
@@ -341,8 +382,25 @@ export class WorldTracker {
     this.anchor.visible = false;
     this._setPlaced(false);
     this._session.reticle = null;
+    this._session.lastScan = -Infinity;
     this.onReticle(null);
-    this._status('Elige de nuevo una superficie y toca para colocar la red.');
+    this._status('Busca otro punto del entorno y toca para colocar la red.');
+    this._diagnostic(this._session, 'tracking', null, true);
+  }
+
+  resetTracking() {
+    const session = this._session;
+    if (!session || !this._active) return false;
+    this.reposition();
+    this._setTracking(false);
+    session.lastPose = -Infinity;
+    session.engineTrackingStatus = 'LIMITED';
+    session.engineTrackingReason = 'INITIALIZING';
+    try { session.engine.XrController.recenter(); }
+    catch (error) { this._fail(session, readableError(error)); return false; }
+    this._status('Reconocimiento reiniciado. Desplaza el teléfono lentamente de lado para reconocer detalles.');
+    this._diagnostic(session, 'initializing', 'tracking-limited', true);
+    return true;
   }
 
   update() {
@@ -353,20 +411,45 @@ export class WorldTracker {
     // Only a changed currentTime counts as a frame; polling cannot keep a
     // frozen stream alive or make an old pose current.
     const videoFresh = this._videoFresh(session, now);
-    if (!videoFresh || now - session.lastPose > STALE_POSE_MS) this._loseTracking(session);
+    if (!videoFresh || now - session.lastPose > STALE_POSE_MS) this._loseTracking(session, videoFresh ? 'no-reality' : 'stale-video');
     if (session.video && now - session.lastVideoFrame > VIDEO_TIMEOUT_MS) {
       this._fail(session, new Error('La cámara dejó de enviar imágenes. Activa de nuevo la RA.'));
     }
   }
 
-  _loseTracking(session) {
+  _loseTracking(session, rejection = 'tracking-limited') {
     if (!this._current(session)) return;
     this.anchor.visible = false;
     session.reticle = null;
+    session.validTargets = 0;
+    session.hitCounts = {};
+    session.rawHits = 0;
+    session.lastScan = -Infinity;
     this.onReticle(null);
-    const wasTracking = this._tracking;
     this._setTracking(false);
-    if (wasTracking) this._status('Seguimiento limitado. Mueve el teléfono despacio y apunta a una zona con textura.');
+    const initializing = !session.engineTrackingStatus || session.engineTrackingReason === 'INITIALIZING';
+    this._status(rejection === 'stale-video' ? 'Esperando una imagen reciente de la cámara.'
+      : initializing ? 'Reconociendo movimiento. Desplaza el teléfono lentamente de lado frente a una zona con detalles.'
+        : 'Seguimiento limitado. Desplaza el teléfono lentamente frente a una zona con detalles.');
+    this._diagnostic(session, initializing ? 'initializing' : 'limited', rejection);
+  }
+
+  _diagnostic(session, state, rejection = null, force = false) {
+    if (!session || (!this._current(session) && state !== 'stopped' && state !== 'error')) return;
+    const now = this._clock();
+    if (!force && now - session.lastDiagnosticAt < 500) return;
+    session.lastDiagnosticAt = now;
+    const video = session.video;
+    const cameraState = !video ? 'unknown' : video.readyState < 2 ? 'waiting'
+      : now - session.lastVideoFrame <= STALE_POSE_MS ? 'live' : 'stalled';
+    this.onDiagnostics({
+      state, reason: session.engineTrackingReason, video: cameraState,
+      hitCounts: { ...session.hitCounts }, validTargets: session.validTargets,
+      lastPoseAgeMs: Number.isFinite(session.lastPose) ? Math.max(0, now - session.lastPose) : null,
+      engineTrackingStatus: session.engineTrackingStatus,
+      engineTrackingReason: session.engineTrackingReason,
+      rejection,
+    });
   }
 
   _setTracking(value) {
@@ -403,6 +486,7 @@ export class WorldTracker {
     this._settle(session, false, readableError(error));
     this.stop();
     this._status(message);
+    this._diagnostic(session, 'error', null, true);
     if (wasStarted) this.onStop(message);
   }
 
@@ -428,6 +512,9 @@ export class WorldTracker {
       }
       closeStream(session.stream);
       session.canvas?.remove();
+      session.reticle = null;
+      session.validTargets = 0;
+      this._diagnostic(session, 'stopped', null, true);
     }
     if (reason && session) { this._status(reason); this.onStop(reason); }
   }

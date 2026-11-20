@@ -8,11 +8,13 @@ Aplicación educativa para Android y navegador: explora una red neuronal 2–4�
 
 1. Abre **https://furawa23.github.io/neuro_ar/** en Chrome actualizado del Android y activa **RA sin marcador**.
 2. Concede acceso a la cámara y, si el navegador lo solicita, a los sensores de movimiento.
-3. Mueve el celular lentamente mirando una superficie horizontal con detalles visibles y buena luz. Usa el suelo o una mesa y mantén una sola superficie como referencia.
-4. Cuando la aplicación esté preparada, toca un punto del área de cámara para **Colocar** la red. Su posición pertenece al espacio que sigue la cámara; puedes caminar despacio alrededor y acercarte mientras se mantenga el seguimiento.
-5. Toca las neuronas o conexiones para inspeccionarlas y utiliza los controles de entrenamiento. Pulsa **Volver a colocar** para elegir otro punto.
+3. Desplaza el celular lentamente de lado mirando una zona con detalles visibles y buena luz para reconocer el movimiento y el entorno.
+4. Cuando aparezca el indicador, pulsa **Colocar en este punto 3D** o toca otro punto del área de cámara. Se aceptan referencias 3D reales del motor; no hace falta detectar una mesa completa. Puedes caminar despacio alrededor mientras se mantenga el seguimiento.
+5. Toca las neuronas o conexiones para inspeccionarlas y utiliza los controles de entrenamiento. **Volver a colocar** permite elegir otro punto; **Reescanear** reinicia el reconocimiento.
 
 No necesitas imprimir una hoja. El seguimiento puede perderse con poca luz, reflejos, superficies lisas o movimientos rápidos. La colocación y el tamaño son aproximados; si la red se desplaza, vuelve a colocarla en una zona con más detalles.
+
+Si no aparece ningún punto, abre **Estado de RA** y pulsa **Copiar estado**. El resumen local distingue inicialización, movimiento limitado y ausencia de objetivos; no incluye imágenes ni coordenadas.
 
 ## Empezar a desarrollar
 

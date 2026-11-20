@@ -10,14 +10,20 @@ Laboratorio educativo para explorar una red neuronal en 3D, inspeccionar sus par
 
 1. Abre **https://furawa23.github.io/neuro_ar/** directamente en Chrome del teléfono. Usa una URL HTTPS y evita el navegador integrado de otra aplicación para esta primera prueba.
 2. Activa **RA sin marcador**. Concede el permiso de cámara y el de sensores de movimiento si el navegador lo solicita.
-3. Encuadra una superficie horizontal con detalles visibles. Puede ser el suelo o una mesa; usa una sola como referencia y evita encuadrar ambas a la vez. Busca luz uniforme y una zona sin reflejos.
-4. Mueve el teléfono lentamente para que el motor reconozca detalles del entorno. Una superficie lisa, oscura o borrosa dificulta obtener una referencia estable.
-5. Cuando la aplicación esté preparada, toca dentro del área de cámara para **Colocar** la red. Su anclaje se calcula en el espacio seguido por el motor.
+3. Encuadra una zona con detalles visibles y contraste, con luz uniforme y sin reflejos. No hace falta detectar una mesa completa: también se aceptan puntos 3D localizados por el motor.
+4. Desplaza el teléfono lentamente de lado para observar detalles desde distintos ángulos; no te limites a girarlo. Una superficie lisa, oscura o borrosa dificulta obtener referencias.
+5. Cuando aparezca un indicador, pulsa **Colocar en este punto 3D** o **Colocar en esta superficie**, según el resultado. El botón utiliza el punto encontrado, aunque no esté exactamente en el centro. También puedes tocar otro punto en la imagen. Una esfera representa un punto del entorno; un aro representa una estimación de superficie.
 6. Camina despacio alrededor o acércate a las neuronas. Toca una neurona o conexión para inspeccionarla; también puedes modificar parámetros, entrenar y recorrer el historial.
-7. Para cambiar de sitio utiliza **Volver a colocar** y toca otra posición. Si el seguimiento deriva o se interrumpe, apunta de nuevo a una zona con detalles antes de colocarla.
+7. Para cambiar de sitio utiliza **Volver a colocar**. **Reescanear** reinicia el reconocimiento y descarta el anclaje anterior; úsalo si comenzaste en una zona poco adecuada.
 8. Vuelve a **Explorar 3D** para detener la sesión de cámara y explorar con giro y zoom en pantalla.
 
 No se necesita un marcador impreso. La posición y el tamaño de la red son aproximados; no constituyen una medición de la superficie. El seguimiento puede interrumpirse por movimientos rápidos, desenfoque, cambios de luz o falta de textura. La sesión no representa un anclaje permanente guardado para futuras visitas.
+
+### Si no aparece un punto de colocación
+
+Abre **Estado de RA** debajo de la cámara. Distingue cámara detenida o congelada, movimiento todavía inicializando, seguimiento limitado y seguimiento activo sin puntos. **Copiar estado** genera un resumen local para soporte; no incluye imágenes, coordenadas, orientación ni datos personales y no se envía automáticamente.
+
+El adaptador solicita `hitTest(x, y, ['FEATURE_POINT'])`, tal como documenta la [API oficial](https://8thwall.org/docs/api/engine/xrcontroller/hittest). Conserva las estimaciones de superficie válidas y permite usar un punto 3D válido como anclaje con seguimiento normal. La versión anterior descartaba `FEATURE_POINT`, esperando solo tipos de superficie que el motor no garantiza devolver.
 
 ## Requisitos y permisos
 

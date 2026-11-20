@@ -2,6 +2,7 @@ import './styles.css';
 import { TrainingSession, TinyNetwork } from './core/network.js';
 import { NetworkView } from './network-view.js';
 import { WorldTracker } from './ar/world-tracker.js';
+import { formatDiagnostics } from './ar/diagnostics-view.js';
 
 const $ = (id) => document.getElementById(id);
 const n = (value) => Number(value).toFixed(3);
@@ -19,6 +20,18 @@ let parameterIdentity;
 let parameterExtent = 8;
 let view;
 let tracker;
+let diagnosticText = 'NeuroAR · todavía no se ha iniciado una sesión de RA.';
+
+function showDiagnostics(packet) {
+  const formatted = formatDiagnostics(packet);
+  $('ar-diagnostics').hidden = false;
+  $('diagnostic-camera').textContent = formatted.camera;
+  $('diagnostic-movement').textContent = formatted.movement;
+  $('diagnostic-target').textContent = formatted.target;
+  $('diagnostic-reason').textContent = formatted.reason;
+  $('restart-tracking').disabled = !tracker?.active;
+  diagnosticText = formatted.copyText;
+}
 
 function select(selection) {
   selected = selection;
@@ -42,7 +55,10 @@ try {
     onReticle: pose => {
       view.setReticle(pose);
       $('place-button').disabled = !pose;
+      $('place-button').textContent = !pose ? 'Buscando punto de colocación…'
+        : pose.type === 'FEATURE_POINT' ? 'Colocar en este punto 3D' : 'Colocar en esta superficie';
     },
+    onDiagnostics: showDiagnostics,
     onRender: milliseconds => view.renderTrackedFrame(milliseconds),
     onStop: reason => { if (arMode) { setMode(false); $('tracking-status').textContent = reason; } },
   });
@@ -205,7 +221,22 @@ $('parameter').addEventListener('input', event => {
 });
 $('pulse-button').addEventListener('click', () => view?.pulse());
 $('reset-view').addEventListener('click', () => { if (arMode) tracker?.reposition(); else view?.resetView(); });
-$('place-button').addEventListener('click', () => tracker?.placeAt(0.5, 0.5));
+$('place-button').addEventListener('click', () => tracker?.placeAt());
+$('restart-tracking').addEventListener('click', () => tracker?.resetTracking());
+$('copy-diagnostics').addEventListener('click', async () => {
+  const text = diagnosticText;
+  try {
+    await navigator.clipboard.writeText(text);
+    $('copy-feedback').textContent = 'Estado copiado';
+    $('diagnostic-copy').hidden = true;
+  } catch {
+    $('diagnostic-copy').value = text;
+    $('diagnostic-copy').hidden = false;
+    $('diagnostic-copy').focus();
+    $('diagnostic-copy').select();
+    $('copy-feedback').textContent = 'Selecciona y copia el texto';
+  }
+});
 $('model-scale').addEventListener('input', event => {
   const scale = view?.setModelScale(Number(event.target.value)) ?? 1;
   $('scale-value').textContent = `${scale.toFixed(1)}×`;
@@ -219,6 +250,11 @@ async function setMode(enabled) {
   view.setArMode(enabled);
   document.body.classList.toggle('ar-mode', enabled);
   $('ar-tools').hidden = !enabled;
+  if (enabled) {
+    $('ar-diagnostics').hidden = false;
+    $('copy-feedback').textContent = '';
+    $('diagnostic-copy').hidden = true;
+  }
   $('place-button').hidden = false;
   $('place-button').disabled = true;
   $('mode-ar').classList.toggle('active', enabled);

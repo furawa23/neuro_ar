@@ -42,12 +42,12 @@ function createFixture({ loadEngine, failCamera = false } = {}) {
   const renderer = { domElement: { parentElement: stage } };
   const camera = new Camera();
   const anchor = new Group();
-  const callbacks = { status: [], tracking: [], placement: [], reticle: [], stop: [], render: [] };
+  const callbacks = { status: [], tracking: [], placement: [], reticle: [], stop: [], render: [], diagnostics: [] };
   const sourceStream = stream();
   const video = { readyState: 2, currentTime: 0 };
   const history = [];
   const engine = {
-    modules: [], runs: [], stops: 0, chunks: [], config: [], projections: [], hits: [], hitCalls: [],
+    modules: [], runs: [], stops: 0, recenters: 0, chunks: [], config: [], projections: [], hits: [], hitCalls: [],
     loadChunk(name) { this.chunks.push(name); return Promise.resolve(); },
     clearCameraPipelineModules() { this.modules = []; },
     addCameraPipelineModules(modules) { this.modules = modules; history.push(modules.at(-1)); },
@@ -68,7 +68,11 @@ function createFixture({ loadEngine, failCamera = false } = {}) {
     configure: config => engine.config.push(config),
     pipelineModule: () => ({ name: 'reality' }),
     updateCameraProjectionMatrix: parameters => engine.projections.push(parameters),
-    hitTest: (x, y) => { engine.hitCalls.push([x, y]); return engine.hits; },
+    hitTest: (x, y, includedTypes) => {
+      engine.hitCalls.push([x, y, includedTypes]);
+      return typeof engine.hits === 'function' ? engine.hits(x, y, includedTypes) : engine.hits;
+    },
+    recenter: () => engine.recenters++,
   };
   const tracker = new WorldTracker({ renderer, camera, anchor,
     platform: { document, window, isSecureContext: true, navigator: { mediaDevices: { getUserMedia() {} } } },
@@ -76,6 +80,7 @@ function createFixture({ loadEngine, failCamera = false } = {}) {
     onStatus: value => callbacks.status.push(value), onTracking: value => callbacks.tracking.push(value),
     onPlacement: value => callbacks.placement.push(value), onReticle: value => callbacks.reticle.push(value),
     onStop: value => callbacks.stop.push(value),
+    onDiagnostics: value => callbacks.diagnostics.push(value),
     onRender: milliseconds => callbacks.render.push({ milliseconds, position: camera.position.toArray(),
       projection: [...camera.projectionMatrix.elements] }),
   });
@@ -100,7 +105,7 @@ test('world adapter starts the real-world pipeline and copies 6DoF camera/projec
     assert.equal(await fixture.tracker.start(), true);
     assert.deepEqual(fixture.engine.chunks, ['slam']);
     assert.deepEqual(fixture.engine.config, [{ disableWorldTracking: false, enableLighting: false,
-      enableWorldPoints: false, scale: 'absolute' }]);
+      enableWorldPoints: false, scale: 'responsive' }]);
     assert.equal(fixture.engine.runs[0].allowedDevices, 'mobile');
     assert.equal(fixture.engine.runs[0].cameraConfig.direction, 'back');
     assert.equal(fixture.engine.modules.length, 3);
@@ -116,7 +121,7 @@ test('world adapter starts the real-world pipeline and copies 6DoF camera/projec
   } finally { fixture.tracker.dispose(); }
 });
 
-test('only SDK surface hits place a world anchor; moving the camera does not move it', async () => {
+test('SDK surface placement stays fixed while the camera moves', async () => {
   const fixture = createFixture();
   try {
     await fixture.tracker.start();
@@ -140,23 +145,24 @@ test('only SDK surface hits place a world anchor; moving the camera does not mov
     assert.equal(fixture.anchor.visible, false);
     assert.deepEqual(fixture.camera.position.toArray(), [-0.5, 1.1, -0.2]);
     fixture.engine.hits = [surface({ position: { x: 1, y: 0, z: -2 } })];
+    fixture.emit();
     assert.equal(fixture.tracker.placeAt(), true);
     assert.deepEqual(fixture.anchor.position.toArray(), [1, 0, -2]);
   } finally { fixture.tracker.dispose(); }
 });
 
-test('unknown points, missing surfaces, invalid hits and untracked states cannot place', async () => {
+test('unknown targets, invalid hits and untracked states cannot place', async () => {
   const fixture = createFixture();
   try {
     await fixture.tracker.start();
     fixture.engine.hits = [surface()];
     assert.equal(fixture.tracker.placeAt(), false, 'no pose has been received yet');
     fixture.emit();
-    for (const hits of [[], [surface({ type: 'FEATURE_POINT' })], [surface({ type: 'UNSPECIFIED' })],
+    for (const hits of [[], [surface({ type: 'UNSPECIFIED' })],
       [surface({ position: { x: NaN, y: 0, z: -1 } })], [surface({ rotation: { x: 0, y: 0, z: 0, w: 0 } })],
       [surface({ distance: -1 })], [surface({ distance: Infinity })]]) {
       fixture.engine.hits = hits;
-      assert.equal(fixture.tracker.placeAt(), false);
+      assert.equal(fixture.tracker.placeAt(0.5, 0.5), false);
       assert.equal(fixture.anchor.visible, false);
     }
     fixture.engine.hits = [surface({ type: 'ESTIMATED_SURFACE' })];
@@ -388,5 +394,110 @@ test('SDK render callback observes the updated camera pose and ignores stale ses
     fixture.history[1].onRender();
     assert.deepEqual(fixture.callbacks.render[1], { milliseconds: 2000,
       position: [-0.5, 1.7, 0.4], projection: fixture.reality().intrinsics });
+  } finally { fixture.tracker.dispose(); }
+});
+
+test('documented FEATURE_POINT query places the displayed off-centre 3D point without a plane', async () => {
+  const fixture = createFixture();
+  const point = surface({ type: 'FEATURE_POINT', position: { x: 0.6, y: 0.8, z: -1.2 } });
+  fixture.engine.hits = (x, y, includedTypes) => {
+    assert.deepEqual(includedTypes, ['FEATURE_POINT']);
+    return x === 0.65 && y === 0.5 ? [point] : [];
+  };
+  try {
+    await fixture.tracker.start(); fixture.emit();
+    const shown = fixture.callbacks.reticle.at(-1);
+    assert.equal(shown.type, 'FEATURE_POINT');
+    assert.deepEqual(shown.screen, { x: 0.65, y: 0.5 });
+    const calls = fixture.engine.hitCalls.length;
+    fixture.engine.hits = [];
+    assert.equal(fixture.tracker.placeAt(), true, 'the button uses the real, recent displayed result');
+    assert.equal(fixture.engine.hitCalls.length, calls, 'it must not incorrectly query the empty centre');
+    assert.deepEqual(fixture.anchor.position.toArray(), [0.6, 0.8, -1.2]);
+    fixture.emit({ position: { x: 1, y: 1.2, z: -0.5 } });
+    assert.deepEqual(fixture.anchor.position.toArray(), [0.6, 0.8, -1.2], 'a camera move cannot drag the point');
+  } finally { fixture.tracker.dispose(); }
+});
+
+test('valid SDK surfaces are preferred while missing hits never create a fallback plane', async () => {
+  const fixture = createFixture();
+  try {
+    await fixture.tracker.start();
+    fixture.engine.hits = [surface({ type: 'FEATURE_POINT', distance: 0.4 }),
+      surface({ type: 'ESTIMATED_SURFACE', distance: 1.1, position: { x: 1, y: 0, z: -1 } })];
+    fixture.emit();
+    assert.equal(fixture.callbacks.reticle.at(-1).type, 'ESTIMATED_SURFACE');
+    assert.equal(fixture.tracker.placeAt(), true);
+    fixture.tracker.reposition();
+    fixture.engine.hits = []; fixture.setTime(1600); fixture.emit();
+    assert.equal(fixture.tracker.placeAt(), false);
+    assert.equal(fixture.anchor.visible, false);
+    const diagnostic = fixture.callbacks.diagnostics.at(-1);
+    assert.equal(diagnostic.state, 'no-target');
+    assert.equal(diagnostic.rejection, 'no-hits');
+    assert.equal(diagnostic.video, 'live');
+    assert.equal(diagnostic.engineTrackingStatus, 'NORMAL');
+  } finally { fixture.tracker.dispose(); }
+});
+
+test('initialization diagnostics are distinct from no-target tracking and reject feature points until ready', async () => {
+  const fixture = createFixture();
+  fixture.engine.hits = [surface({ type: 'FEATURE_POINT' })];
+  try {
+    await fixture.tracker.start(); fixture.setTime(1600);
+    fixture.emit({ trackingStatus: 'LIMITED', trackingReason: 'INITIALIZING' });
+    const initializing = fixture.callbacks.diagnostics.at(-1);
+    assert.equal(initializing.state, 'initializing');
+    assert.equal(initializing.engineTrackingReason, 'INITIALIZING');
+    assert.equal(initializing.video, 'live');
+    assert.equal(fixture.tracker.placeAt(), false);
+    assert.match(fixture.callbacks.status.at(-1), /Reconociendo movimiento/);
+    fixture.setTime(2200); fixture.emit();
+    assert.equal(fixture.callbacks.diagnostics.at(-1).state, 'target');
+    assert.ok(fixture.callbacks.diagnostics.at(-1).hitCounts.FEATURE_POINT > 0);
+    assert.equal(fixture.tracker.placeAt(), true);
+    fixture.setTime(2600); fixture.tracker.reposition(); fixture.tracker.update();
+    assert.equal(fixture.tracker.placeAt(), false, 'stale tracking invalidates a cached point');
+  } finally { fixture.tracker.dispose(); }
+});
+
+test('explicit rescan discards placement before recentering and errors survive idempotent stop', async () => {
+  const fixture = createFixture();
+  try {
+    await fixture.tracker.start(); fixture.engine.hits = [surface({ type: 'FEATURE_POINT' })]; fixture.emit();
+    fixture.tracker.placeAt();
+    fixture.engine.XrController.recenter = () => {
+      assert.equal(fixture.anchor.visible, false);
+      assert.equal(fixture.tracker.placed, false);
+      assert.equal(fixture.tracker.placeAt(), false);
+      fixture.engine.recenters++;
+    };
+    assert.equal(fixture.tracker.resetTracking(), true);
+    assert.equal(fixture.engine.recenters, 1);
+    assert.equal(fixture.callbacks.diagnostics.at(-1).state, 'initializing');
+    fixture.emit({ trackingStatus: 'LIMITED', trackingReason: 'INITIALIZING' });
+    assert.equal(fixture.tracker.placeAt(), false);
+    fixture.emit(); assert.equal(fixture.tracker.placeAt(), true);
+    fixture.history[0].onException(new Error('test camera interruption'));
+    assert.equal(fixture.callbacks.diagnostics.at(-1).state, 'error');
+    fixture.tracker.stop();
+    assert.equal(fixture.callbacks.diagnostics.at(-1).state, 'error');
+  } finally { fixture.tracker.dispose(); }
+});
+
+test('candidate scans and diagnostic packets are throttled independently of camera updates', async () => {
+  const fixture = createFixture();
+  try {
+    await fixture.tracker.start(); fixture.engine.hits = [surface({ type: 'FEATURE_POINT' })]; fixture.emit();
+    const scans = fixture.engine.hitCalls.length;
+    const diagnostics = fixture.callbacks.diagnostics.length;
+    for (const time of [1016, 1032, 1050, 1080, 1100]) { fixture.setTime(time); fixture.emit(); }
+    assert.equal(fixture.engine.hitCalls.length, scans);
+    assert.equal(fixture.callbacks.diagnostics.length, diagnostics);
+    fixture.setTime(1130); fixture.emit();
+    assert.equal(fixture.engine.hitCalls.length, scans * 2);
+    assert.equal(fixture.callbacks.diagnostics.length, diagnostics);
+    fixture.setTime(1600); fixture.emit();
+    assert.equal(fixture.callbacks.diagnostics.length, diagnostics + 1);
   } finally { fixture.tracker.dispose(); }
 });

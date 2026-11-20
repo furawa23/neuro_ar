@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { SpatialInspector } from './spatial-inspector.js';
 
 const NODE_DEFINITIONS = [
   { layer: 0, index: 0, name: 'x₁', spoken: 'Entrada 1', position: [-1.65, 0.5, 0] },
@@ -22,6 +23,7 @@ export class NetworkView {
     this.onPlace = null;
     this.onFrame = null;
     this.onError = null;
+    this.onInspectorAction = null;
     this.available = false;
     this.isArMode = false;
     this.placed = false;
@@ -43,6 +45,7 @@ export class NetworkView {
     this.connections = [];
     this.geometries = new Set();
     this.materials = new Set();
+    this.textures = new Set();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.point = new THREE.Vector3();
@@ -95,6 +98,8 @@ export class NetworkView {
     this.scene.add(this.grid);
     this.buildGraph();
     this.buildReticle();
+    this.inspector = new SpatialInspector();
+    this.content.add(this.inspector.root);
     this.bindPointers();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(stage);
@@ -138,6 +143,19 @@ export class NetworkView {
       button.setAttribute('aria-label', definition.spoken);
       this.labels.append(button);
       this.nodes.push({ ...definition, selection, mesh, ring, material, button, value, color: new THREE.Color(color), activation: 0 });
+      const canvas = document.createElement('canvas');
+      canvas.width = 384; canvas.height = 160;
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter; texture.generateMipmaps = false;
+      this.textures.add(texture);
+      const sprite = new THREE.Sprite(this.material(new THREE.SpriteMaterial({ map: texture, toneMapped: false, depthWrite: false })));
+      sprite.userData.selection = selection;
+      sprite.position.copy(mesh.position); sprite.position.y -= 0.28;
+      sprite.scale.set(0.58, 0.24, 1);
+      sprite.visible = false;
+      this.content.add(sprite);
+      Object.assign(this.nodes.at(-1), { sprite, labelCanvas: canvas, labelTexture: texture });
     }
     for (let h = 0; h < 4; h++) {
       for (let i = 0; i < 2; i++) this.addConnection(cylinder, this.nodes[i], this.nodes[h + 2], { kind: 'connection', layer: 1, target: h, source: i });
@@ -220,6 +238,16 @@ export class NetworkView {
       node.activation = node.layer === 0 ? snapshot.inputs[node.index] : node.layer === 1 ? snapshot.hiddenActivations[node.index] : snapshot.output;
       const value = node.activation.toFixed(3);
       node.value.textContent = value;
+      const labelText = `${node.name}  ${value}`;
+      if (node.labelText !== labelText) {
+        node.labelText = labelText;
+        const ctx = node.labelCanvas.getContext('2d');
+        ctx.clearRect(0, 0, 384, 160);
+        ctx.fillStyle = '#102f31'; ctx.beginPath(); ctx.roundRect(2, 12, 380, 136, 20); ctx.fill();
+        ctx.fillStyle = '#edfae7'; ctx.font = '500 56px system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.fillText(labelText, 192, 101);
+        node.labelTexture.needsUpdate = true;
+      }
       node.button.setAttribute('aria-label', `${node.spoken}, valor ${value}`);
       node.material.color.copy(node.color).multiplyScalar(0.64 + Math.min(1, Math.abs(node.activation)) * 0.36);
     }
@@ -259,8 +287,14 @@ export class NetworkView {
     if (this.isArMode && (!this.placed || !this.anchor.visible)) return false;
     this.select(selection);
     this.onSelect?.(selection);
+    const point = selection.kind === 'neuron'
+      ? this.nodes.find(node => sameSelection(selection, node.selection))?.mesh.position
+      : this.connections.find(connection => sameSelection(selection, connection.selection))?.group.position;
+    if (point) this.inspector.openAt(point, this.isArMode);
     return true;
   }
+
+  setInspectorData(data) { this.inspector?.setData(data); }
 
   pulse() { this.pulseStarted = performance.now() / 1000; }
 
@@ -273,6 +307,7 @@ export class NetworkView {
     this.grid.visible = !enabled;
     this.anchor.visible = false;
     this.placed = false;
+    this.inspector.close();
     if (this.reticle) this.reticle.visible = false;
     if (enabled) {
       this.anchor.add(this.content);
@@ -291,6 +326,7 @@ export class NetworkView {
   /** Placement and camera tracking are independent: losing tracking never re-places the model. */
   setPlacementState(placed) {
     this.placed = Boolean(placed);
+    if (!this.placed) this.inspector?.close();
     if (!this.placed) this.anchor.visible = false;
     if (this.reticle && this.placed) this.reticle.visible = false;
   }
@@ -401,7 +437,14 @@ export class NetworkView {
       this.direction.set(this.pointer.x, this.pointer.y, 0.5).unproject(this.arCamera).sub(origin).normalize();
       this.raycaster.set(origin, this.direction);
     } else this.raycaster.setFromCamera(this.pointer, this.previewCamera);
-    const nodeHits = this.raycaster.intersectObjects(this.nodes.map(node => node.mesh), false);
+    const cardHit = this.inspector.hitTest(this.raycaster);
+    if (cardHit) {
+      this.inspector.activate(cardHit.action);
+      if (cardHit.action === 'increase' || cardHit.action === 'decrease') this.onInspectorAction?.(cardHit.action);
+      return true;
+    }
+    this.raycaster.camera = this.camera;
+    const nodeHits = this.raycaster.intersectObjects(this.nodes.flatMap(node => node.sprite.visible ? [node.mesh, node.sprite] : [node.mesh]), false);
     if (nodeHits.length) return this.choose(nodeHits[0].object.userData.selection);
     const connectionHits = this.raycaster.intersectObjects(this.connections.map(connection => connection.hit), false);
     if (connectionHits.length) return this.choose(connectionHits[0].object.userData.selection);
@@ -441,17 +484,20 @@ export class NetworkView {
     }
     this.scene.updateMatrixWorld(true);
     this.camera.updateMatrixWorld(true);
+    this.inspector.faceCamera(this.camera);
     const visible = !this.isArMode || (this.placed && this.anchor.visible);
+    const spatialLabels = this.isArMode || this.inspector.root.visible;
     for (const node of this.nodes) {
+      node.sprite.visible = spatialLabels;
       this.point.copy(node.mesh.position);
       this.point.y -= 0.26;
       this.content.localToWorld(this.point);
-      this.projectLabel(node.button, this.point, visible);
+      this.projectLabel(node.button, this.point, visible && !spatialLabels);
     }
     for (const label of this.layerLabels) {
       this.point.copy(label.point);
       this.content.localToWorld(this.point);
-      this.projectLabel(label.element, this.point, visible);
+      this.projectLabel(label.element, this.point, visible && !spatialLabels);
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -477,6 +523,8 @@ export class NetworkView {
       window.removeEventListener('pointercancel', this.pointerCancel);
       for (const geometry of this.geometries) geometry.dispose();
       for (const material of this.materials) material.dispose();
+      for (const texture of this.textures) texture.dispose();
+      this.inspector?.dispose();
       this.renderer.dispose();
       canvas.remove();
     }

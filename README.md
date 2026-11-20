@@ -1,8 +1,8 @@
 # NeuroAR · laboratorio web de redes neuronales
 
-Aplicación educativa para Android y navegador: explora una red neuronal 2–4–1, inspecciona sus parámetros y observa cómo aprende. El modo **RA sin marcador** usa seguimiento del entorno con 8th Wall para colocar la red en un punto del espacio y acercarte a ella con el celular. La carpeta principal es **[web/](web/README.md)** y genera archivos estáticos para GitHub Pages, Firebase Hosting o un VPS con HTTPS.
+Aplicación educativa para Android y navegador: explora una red neuronal 2–4–1, inspecciona sus parámetros y observa cómo aprende. El modo **RA sin marcador** usa seguimiento del entorno con 8th Wall para colocar la red en un punto del espacio y acercarte a ella con el celular. La cámara ocupa toda la aplicación y la información de cada neurona o conexión aparece en una ficha WebGL 3D junto a la red. La carpeta principal es **[web/](web/README.md)** y genera archivos estáticos para GitHub Pages, Firebase Hosting o un VPS con HTTPS.
 
-**Estado:** la cámara, el anclaje espacial y el rendimiento en el Xiaomi Redmi Note 12S requieren validación física. La compilación y las pruebas matemáticas no certifican la compatibilidad del teléfono ni la estabilidad del seguimiento. El modo **Explorar 3D** permite usar el laboratorio sin cámara.
+**Estado:** el usuario confirmó que la RA anterior funciona bien en su Xiaomi Redmi Note 12S. La nueva interfaz de cámara a pantalla completa y las fichas 3D requieren una prueba física de legibilidad e interacción; la compilación y las pruebas automatizadas no la sustituyen. El modo **Explorar 3D** permite usar el laboratorio sin cámara.
 
 ## Probar la realidad aumentada
 
@@ -10,11 +10,12 @@ Aplicación educativa para Android y navegador: explora una red neuronal 2–4�
 2. Concede acceso a la cámara y, si el navegador lo solicita, a los sensores de movimiento.
 3. Desplaza el celular lentamente de lado mirando una zona con detalles visibles y buena luz para reconocer el movimiento y el entorno.
 4. Cuando aparezca el indicador, pulsa **Colocar en este punto 3D** o toca otro punto del área de cámara. Se aceptan referencias 3D reales del motor; no hace falta detectar una mesa completa. Puedes caminar despacio alrededor mientras se mantenga el seguimiento.
-5. Toca las neuronas o conexiones para inspeccionarlas y utiliza los controles de entrenamiento. **Volver a colocar** permite elegir otro punto; **Reescanear** reinicia el reconocimiento.
+5. Toca una neurona o conexión para abrir su ficha 3D. **Valores** muestra las matemáticas y **Concepto** su explicación; **− 0.1** y **+ 0.1** editan el sesgo o el peso. Acércate para leerla y pulsa **×** para cerrarla.
+6. Abre **Controles** para elegir ejemplos, entrenar, pausar o recorrer el historial. **Ajustes de la escena** contiene tamaño, reescanear y ayuda. **Volver a colocar** permite elegir otro punto; **Salir de RA** vuelve al laboratorio 3D.
 
 No necesitas imprimir una hoja. El seguimiento puede perderse con poca luz, reflejos, superficies lisas o movimientos rápidos. La colocación y el tamaño son aproximados; si la red se desplaza, vuelve a colocarla en una zona con más detalles.
 
-Si no aparece ningún punto, abre **Estado de RA** y pulsa **Copiar estado**. El resumen local distingue inicialización, movimiento limitado y ausencia de objetivos; no incluye imágenes ni coordenadas.
+Si no aparece ningún punto, abre **Controles → Estado de RA** y pulsa **Copiar estado**. El resumen local distingue inicialización, movimiento limitado y ausencia de objetivos; no incluye imágenes ni coordenadas.
 
 ## Empezar a desarrollar
 
@@ -43,7 +44,8 @@ El resultado es `web/dist/`. Consulta **[desarrollo y despliegue](web/README.md)
 - Edición de parámetros y entrenamiento por retropropagación con curva BCE.
 - Historial exacto: pausa, retrocede y edita un estado anterior para crear otro recorrido.
 - Exploración 3D con giro y zoom, interfaz adaptable a móvil e inspector accesible.
-- RA sin marcador con seguimiento espacial del entorno, colocación por toque y nueva colocación.
+- RA sin marcador con cámara a pantalla completa, seguimiento espacial del entorno, colocación por toque y nueva colocación.
+- Fichas 3D con valores, conceptos y edición de sesgo o peso; menú compacto para entrenamiento e historial.
 - Manifiesto para añadirla a la pantalla de inicio cuando el navegador lo permita. No se garantiza funcionamiento sin conexión.
 
 ## Motor y versiones anteriores

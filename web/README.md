@@ -1,27 +1,32 @@
 # NeuroAR web · Android · RA sin marcador
 
-Laboratorio educativo para explorar una red neuronal en 3D, inspeccionar sus parámetros y observar un entrenamiento. **RA sin marcador** utiliza SLAM de 8th Wall: estima el movimiento de la cámara respecto al entorno y permite colocar la red en un punto del espacio. Después de colocarla puedes acercarte y recorrerla con el celular mientras se mantenga el seguimiento.
+Laboratorio educativo para explorar una red neuronal en 3D, inspeccionar sus parámetros y observar un entrenamiento. **RA sin marcador** utiliza SLAM de 8th Wall: estima el movimiento de la cámara respecto al entorno y permite colocar la red en un punto del espacio. La cámara ocupa toda el área de la aplicación; al tocar una neurona o conexión aparece una ficha WebGL 3D vinculada a la red. Después de colocarla puedes acercarte y recorrerla con el celular mientras se mantenga el seguimiento.
 
 `web/` es independiente del proyecto Unity de la raíz. Su compilación produce archivos estáticos para GitHub Pages, Firebase Hosting o un VPS con HTTPS.
 
-**Estado de validación:** un diagnóstico enviado desde el Xiaomi Redmi Note 12S confirma cámara activa, seguimiento `NORMAL` y resultados de puntos 3D. La colocación, su estabilidad al caminar y el rendimiento siguen pendientes de prueba física. El objetivo inicial es Chrome actualizado en Android. Los tests matemáticos, la compilación y la revisión en escritorio no certifican el anclaje físico. **Explorar 3D** sigue disponible como modo sin cámara.
+**Estado de validación:** el usuario confirmó que la RA de la versión anterior funciona bien en su Xiaomi Redmi Note 12S. La nueva interfaz de cámara a pantalla completa y las fichas 3D todavía necesitan una prueba física de legibilidad e interacción en ese teléfono. Los tests y la revisión en escritorio no sustituyen esa comprobación ni una evaluación de rendimiento y deriva con uso sostenido. El objetivo inicial es Chrome actualizado en Android. **Explorar 3D** sigue disponible como modo sin cámara.
 
 ## Usar la RA en Android
 
 1. Abre **https://furawa23.github.io/neuro_ar/** directamente en Chrome del teléfono. Usa una URL HTTPS y evita el navegador integrado de otra aplicación para esta primera prueba.
-2. Activa **RA sin marcador**. Concede el permiso de cámara y el de sensores de movimiento si el navegador lo solicita.
+2. Activa **RA sin marcador**. La cámara ocupa toda la aplicación. Concede el permiso de cámara y el de sensores de movimiento si el navegador lo solicita.
 3. Encuadra una zona con detalles visibles y contraste, con luz uniforme y sin reflejos. No hace falta detectar una mesa completa: también se aceptan puntos 3D localizados por el motor.
 4. Desplaza el teléfono lentamente de lado para observar detalles desde distintos ángulos; no te limites a girarlo. Una superficie lisa, oscura o borrosa dificulta obtener referencias.
 5. Cuando aparezca un indicador, pulsa **Colocar en este punto 3D** o **Colocar en esta superficie**, según el resultado. El botón utiliza el punto encontrado, aunque no esté exactamente en el centro. También puedes tocar otro punto en la imagen. Una esfera representa un punto del entorno; un aro representa una estimación de superficie.
-6. Camina despacio alrededor o acércate a las neuronas. Toca una neurona o conexión para inspeccionarla; también puedes modificar parámetros, entrenar y recorrer el historial.
-7. Para cambiar de sitio utiliza **Volver a colocar**. **Reescanear** reinicia el reconocimiento y descarta el anclaje anterior; úsalo si comenzaste en una zona poco adecuada.
-8. Vuelve a **Explorar 3D** para detener la sesión de cámara y explorar con giro y zoom en pantalla.
+6. Camina despacio alrededor o acércate a las neuronas. Toca una neurona o conexión para abrir su ficha dentro de la escena: **Valores** muestra la activación y la fórmula; **Concepto** explica su función. Los botones **− 0.1** y **+ 0.1** modifican el sesgo de una neurona oculta o de salida, o el peso de una conexión. Las entradas no tienen un sesgo editable. La **×** cierra la ficha.
+7. Abre **Controles** para elegir un ejemplo XOR, entrenar, pausar o recorrer el historial. **Ajustes de la escena** contiene el tamaño de la red, **Ver señal**, **Reescanear** y la ayuda. El menú permanece cerrado hasta que lo solicites.
+8. Para cambiar de sitio utiliza **Volver a colocar**. **Controles → Ajustes de la escena → Reescanear** reinicia el reconocimiento y descarta el anclaje anterior; úsalo si comenzaste en una zona poco adecuada.
+9. Pulsa **Salir de RA** para detener la sesión de cámara y regresar al laboratorio **Explorar 3D**, con giro y zoom en pantalla.
+
+La ficha está renderizada como un plano 3D, unido al contenido anclado y orientado hacia la cámara para facilitar la lectura. Sus valores se actualizan al editar, entrenar o recorrer el historial. Acércate para leerla: su tamaño es espacial. Al volver a colocar la red o cambiar de modo se cierra. El inspector HTML permanece disponible en el laboratorio 3D y se oculta durante la RA.
+
+La vista de cámara llena el área disponible mediante CSS. **Controles → Ajustes de la escena → Pantalla completa** solicita además ocultar las barras del navegador cuando este lo permite; si no lo permite, la cámara sigue ocupando toda la aplicación.
 
 No se necesita un marcador impreso. La posición y el tamaño de la red son aproximados; no constituyen una medición de la superficie. El seguimiento puede interrumpirse por movimientos rápidos, desenfoque, cambios de luz o falta de textura. La sesión no representa un anclaje permanente guardado para futuras visitas.
 
 ### Si no aparece un punto de colocación
 
-Abre **Estado de RA** debajo de la cámara. Distingue cámara detenida o congelada, movimiento todavía inicializando, seguimiento limitado y seguimiento activo sin puntos. **Copiar estado** genera un resumen local para soporte; no incluye imágenes, coordenadas, orientación ni datos personales y no se envía automáticamente.
+Abre **Controles → Estado de RA**. Distingue cámara detenida o congelada, movimiento todavía inicializando, seguimiento limitado y seguimiento activo sin puntos. **Copiar estado** genera un resumen local para soporte; no incluye imágenes, coordenadas, orientación ni datos personales y no se envía automáticamente.
 
 El adaptador solicita `hitTest(x, y, ['FEATURE_POINT'])`, tal como documenta la [API oficial](https://8thwall.org/docs/api/engine/xrcontroller/hittest). Conserva las estimaciones de superficie válidas y permite usar un punto 3D válido como anclaje con seguimiento normal. La versión anterior descartaba `FEATURE_POINT`, esperando solo tipos de superficie que el motor no garantiza devolver.
 
@@ -114,9 +119,11 @@ La aplicación conserva archivos y pruebas del prototipo anterior con ARToolkit 
 - Abrir la URL HTTPS y comprobar que el motor y la interfaz cargan sin errores de recursos.
 - Aceptar o rechazar permisos y confirmar que 3D sigue disponible.
 - Establecer seguimiento, colocar la red y verificar que conserva su posición al caminar alrededor.
-- Seleccionar neuronas y conexiones, editar, entrenar y recorrer el historial en RA.
+- Comprobar que la cámara ocupa toda la aplicación en vertical y horizontal, que **Salir de RA** responde y que el menú **Controles** se abre y cierra sin desplazar la red.
+- Seleccionar neuronas y conexiones, acercarse para leer **Valores** y **Concepto**, editar con **−/+**, y cerrar la ficha 3D.
+- Entrenar, pausar y recorrer el historial desde **Controles**; comprobar que la ficha refleja el estado seleccionado.
 - Volver a colocar la red, cambiar a 3D y reiniciar la cámara.
 - Bloquear y desbloquear el teléfono, cambiar de aplicación y comprobar la recuperación.
 - Evaluar temperatura, fluidez y deriva con uso sostenido en el Redmi.
 
-Estas comprobaciones de cámara y movimiento siguen pendientes en el teléfono; las pruebas automatizadas no las sustituyen.
+El funcionamiento de la RA anterior fue confirmado por el usuario en el Redmi. Las comprobaciones de la nueva interfaz inmersiva, la legibilidad de las fichas y el uso sostenido siguen pendientes en el teléfono; las pruebas automatizadas no las sustituyen.

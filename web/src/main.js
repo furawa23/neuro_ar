@@ -22,6 +22,38 @@ let view;
 let tracker;
 let diagnosticText = 'NeuroAR · todavía no se ha iniciado una sesión de RA.';
 
+// Move controls, never the stage or its camera/WebGL canvases. Keeping the same
+// elements preserves training state and listeners when entering immersive AR.
+const immersivePanels = [
+  [document.querySelector('.experiment-bar'), $('ar-experiment-slot')],
+  [document.querySelector('.training'), $('ar-training-slot')],
+  [$('ar-diagnostics'), $('ar-diagnostic-slot')],
+].map(([element, slot]) => {
+  const home = document.createComment('Control position outside AR');
+  element.before(home);
+  return { element, slot, home };
+});
+
+function setArMenu(open, { focus = true } = {}) {
+  const visible = arMode && open;
+  $('ar-menu').hidden = !visible;
+  $('toggle-ar-menu').setAttribute('aria-expanded', String(visible));
+  if (focus && arMode) (visible ? $('close-ar-menu') : $('toggle-ar-menu')).focus();
+}
+
+function setImmersiveLayout(enabled) {
+  setArMenu(false, { focus: false });
+  for (const { element, slot, home } of immersivePanels) {
+    if (enabled) slot.append(element);
+    else home.after(element);
+  }
+  $('ar-hud').hidden = !enabled;
+  $('fullscreen-feedback').textContent = '';
+  if (!enabled && document.fullscreenElement === document.querySelector('.scene-frame')) {
+    void document.exitFullscreen().catch(() => {});
+  }
+}
+
 function showDiagnostics(packet) {
   const formatted = formatDiagnostics(packet);
   $('ar-diagnostics').hidden = false;
@@ -62,6 +94,14 @@ try {
     onRender: milliseconds => view.renderTrackedFrame(milliseconds),
     onStop: reason => { if (arMode) { setMode(false); $('tracking-status').textContent = reason; } },
   });
+  view.onInspectorAction = action => {
+    if (action !== 'increase' && action !== 'decrease') return;
+    if (selected.layer === 0) return;
+    const current = selected.kind === 'connection'
+      ? session.network.getWeight(selected.layer, selected.target, selected.source)
+      : session.network.getBias(selected.layer, selected.index);
+    editParameter(Number((current + (action === 'increase' ? 0.1 : -0.1)).toFixed(4)));
+  };
   view.onPlace = (x, y) => tracker.placeAt(x, y);
   view.onFrame = time => tracker?.update(time);
 } catch (error) {
@@ -86,7 +126,11 @@ for (let layer = 1; layer <= 2; layer++) {
       // The middle dot labels a connection without suggesting a control action.
       button.textContent = `${label(layer - 1, source)} · ${label(layer, target)}`;
       button.dataset.key = `${layer}-${target}-${source}`;
-      button.addEventListener('click', () => select({ kind: 'connection', layer, target, source }));
+      button.addEventListener('click', () => {
+        const selection = { kind: 'connection', layer, target, source };
+        if (view?.available) view.choose(selection);
+        else select(selection);
+      });
       $('connection-buttons').append(button);
     }
   }
@@ -153,6 +197,9 @@ function refreshInspector() {
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', active);
   }
+  view?.setInspectorData({ title, kind, resultLabel, result, formula, lesson,
+    parameterLabel: isConnection ? 'Modificar peso' : 'Modificar sesgo',
+    parameterValue: value, editable: layer > 0, hint });
 }
 
 function drawLoss() {
@@ -210,15 +257,16 @@ $('play-button').addEventListener('click', () => {
 $('step-button').addEventListener('click', () => { pause(); step(); });
 $('reset-training').addEventListener('click', () => { pause(); session.reset(); $('training-hint').textContent = 'Retropropagación sobre 4 ejemplos · puedes pausar y retroceder.'; refresh(); });
 $('timeline').addEventListener('input', event => { pause(); session.scrub(Number(event.target.value)); refresh(); });
-$('parameter').addEventListener('input', event => {
+function editParameter(value) {
+  if (!Number.isFinite(value) || selected.layer === 0) return;
   pause();
-  const value = Number(event.target.value);
   const wasPast = session.historyIndex < session.historyCount - 1;
   if (selected.kind === 'connection') session.editWeight(selected.layer, selected.target, selected.source, value);
   else if (selected.layer > 0) session.editBias(selected.layer, selected.index, value);
   if (wasPast) $('training-hint').textContent = 'Editaste un estado anterior: el recorrido futuro se recalculará desde aquí.';
   refresh();
-});
+}
+$('parameter').addEventListener('input', event => editParameter(Number(event.target.value)));
 $('pulse-button').addEventListener('click', () => view?.pulse());
 $('reset-view').addEventListener('click', () => { if (arMode) tracker?.reposition(); else view?.resetView(); });
 $('place-button').addEventListener('click', () => tracker?.placeAt());
@@ -247,6 +295,7 @@ async function setMode(enabled) {
   const ticket = ++modeGeneration;
   pause();
   arMode = enabled;
+  setImmersiveLayout(enabled);
   view.setArMode(enabled);
   document.body.classList.toggle('ar-mode', enabled);
   $('ar-tools').hidden = !enabled;
@@ -276,10 +325,6 @@ async function setMode(enabled) {
   $('mode-ar').disabled = true;
   // The user can cancel while the browser is awaiting camera permission.
   $('mode-3d').disabled = false;
-  if (window.matchMedia('(max-width: 760px)').matches) {
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    $('stage').scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
-  }
   try { await tracker.start(); }
   catch (error) {
     if (ticket !== modeGeneration) return;
@@ -297,6 +342,27 @@ async function setMode(enabled) {
 }
 $('mode-ar').addEventListener('click', () => { if (!arMode) setMode(true); });
 $('mode-3d').addEventListener('click', () => { if (arMode) setMode(false); });
+$('exit-ar').addEventListener('click', async () => { await setMode(false); $('mode-ar').focus(); });
+$('toggle-ar-menu').addEventListener('click', () => setArMenu($('ar-menu').hidden));
+$('close-ar-menu').addEventListener('click', () => setArMenu(false));
+$('ar-pulse-button').addEventListener('click', () => view?.pulse());
+$('ar-help-button').addEventListener('click', () => $('help-dialog').showModal());
+$('fullscreen-button').addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (document.querySelector('.scene-frame').requestFullscreen) {
+      await document.querySelector('.scene-frame').requestFullscreen({ navigationUI: 'hide' });
+    } else $('fullscreen-feedback').textContent = 'La cámara ya ocupa toda el área disponible de la aplicación.';
+  } catch {
+    $('fullscreen-feedback').textContent = 'La cámara ocupa toda la aplicación. Este navegador mantiene visibles sus propias barras.';
+  }
+});
+document.addEventListener('fullscreenchange', () => {
+  $('fullscreen-button').textContent = document.fullscreenElement ? 'Mostrar barras del navegador' : 'Pantalla completa';
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && arMode && !$('ar-menu').hidden && !$('help-dialog').open) setArMenu(false);
+});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { pause(); if (arMode) { startingCamera = false; setMode(false); } }
 });

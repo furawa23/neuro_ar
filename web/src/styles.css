@@ -13,3 +13,104 @@
 @media(max-width:520px){.scene-toolbar .scene-action{margin-left:auto}.ar-tools{gap:8px;padding:10px}.ar-tools button{width:100%}.ar-tools label{margin-left:0}.ar-tools input{max-width:none}.text-link{max-width:92px;font-size:.8125rem}.scene-footer #tracking-status{max-width:70%}.scene-footer .scene-action{white-space:normal;text-align:right;max-width:30%;min-height:44px}}
 .ar-tools button.quiet{background:#254c43;color:#d7e8c0}.ar-diagnostics{border-top:1px solid #ffffff16;padding:8px 16px 12px;color:#c0d7ca;font-size:.875rem;line-height:1.6}.ar-diagnostics[hidden]{display:none}.ar-diagnostics summary{cursor:pointer;min-height:35px;padding:5px 0;color:#d3e6d7}.ar-diagnostics dl{margin:10px 0}.ar-diagnostics dl>div{display:flex;justify-content:space-between;gap:16px;border-bottom:1px solid #ffffff10;padding:5px 0}.ar-diagnostics dt{color:#92b0a2}.ar-diagnostics dd{margin:0;text-align:right;max-width:72%;overflow-wrap:anywhere}.ar-diagnostics p{margin:9px 0}.diagnostic-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.diagnostic-actions button{background:#254c43;border:1px solid #517362;color:#d9e9d8;border-radius:5px;padding:8px 12px;min-height:42px;font-size:.875rem}.diagnostic-actions span,.diagnostic-privacy{font-size:.75rem;color:#9db8a8}.ar-diagnostics textarea{width:100%;min-height:140px;background:#0b2223;border:1px solid #54726b;color:#d4e8da;border-radius:5px;padding:10px;margin-top:12px;font:14px/1.5 monospace}.ar-diagnostics textarea[hidden]{display:none}
 @media(max-width:520px){.ar-tools button.quiet{width:auto;flex:1;min-width:95px}.ar-diagnostics{padding:8px 12px 12px}.ar-diagnostics dl>div{gap:10px}}
+
+/* Immersive AR: the camera stays mounted and fills the viewport. Only controls
+   move between the laboratory and the optional experiment drawer. */
+.ar-hud[hidden],.ar-menu[hidden]{display:none}
+html:has(body.ar-mode){overflow:hidden;overscroll-behavior:none}
+body.ar-mode{overflow:hidden;overscroll-behavior:none;background:#102a2b}
+.ar-mode .app-header,.ar-mode .app-footer,.ar-mode .lab-heading,
+.ar-mode .experiment-note,.ar-mode .inspector,.ar-mode .scene-toolbar,
+.ar-mode .scene-legend{display:none}
+.ar-mode .workspace{display:block;margin:0;padding:0;max-width:none}
+.ar-mode .scene-frame{
+  position:fixed;inset:0;z-index:1000;width:100%;height:100vh;height:100dvh;
+  margin:0;border:0;border-radius:0;box-shadow:none;overflow:hidden;
+}
+.ar-mode #stage{
+  position:absolute;inset:0;width:100%;height:100%!important;min-height:0;
+  border-radius:0;background:#102a2b;
+}
+.ar-hud{
+  position:absolute;z-index:6;top:0;left:0;right:0;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(12px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 24px max(14px,env(safe-area-inset-left));
+  background:linear-gradient(#061c22bd,transparent);pointer-events:none;
+}
+.ar-hud-button{
+  pointer-events:auto;min-height:46px;padding:10px 15px;
+  border:1px solid #ffffff32;border-radius:12px;background:#09292bd9;
+  color:#eef8ef;font-size:.875rem;font-weight:600;backdrop-filter:blur(12px);
+}
+.ar-hud-button:hover{background:#1b4b43}
+.ar-brand{font:700 1.2rem 'Space Grotesk',sans-serif;letter-spacing:-.6px;color:#f2faf5;text-shadow:0 2px 8px #0008}
+.ar-brand span{color:#d5efa8}
+.ar-mode .ar-tools{
+  position:absolute;z-index:5;left:50%;bottom:calc(106px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);display:flex;flex-wrap:nowrap;
+  width:max-content;max-width:calc(100% - 32px);padding:0;background:none;border:0;
+}
+.ar-mode .ar-tools[hidden],.ar-mode .ar-tools:has(#place-button[hidden]){display:none}
+.ar-mode .ar-tools #place-button{
+  width:auto;min-width:220px;max-width:100%;min-height:50px;padding:13px 20px;
+  border:1px solid #e6f3d69c;border-radius:14px;background:#d7e8c0;
+  box-shadow:0 5px 25px #0004;color:#1c3a2d;font-size:.9375rem;
+}
+.ar-mode .ar-tools #place-button:disabled{background:#102a2be6;color:#edf5e9;border-color:#ffffff4d;opacity:.9}
+.ar-mode .scene-footer{
+  position:absolute;z-index:5;left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right));
+  bottom:calc(14px + env(safe-area-inset-bottom));min-height:52px;
+  padding:10px 14px;gap:12px;border:1px solid #ffffff22;border-radius:14px;
+  background:#08252ad9;backdrop-filter:blur(12px);pointer-events:none;
+}
+.ar-mode .scene-footer #tracking-status{font-size:.875rem;line-height:1.5;max-width:none;color:#ecf6ed;flex:1}
+.ar-mode .scene-footer .scene-action{
+  pointer-events:auto;max-width:none;min-height:44px;padding:9px 10px;
+  color:#d7e8c0;font-size:.875rem;white-space:normal;text-align:center;
+  border:1px solid #d7e8c044;border-radius:8px;background:#143b36;
+}
+.ar-menu{
+  position:absolute;z-index:7;top:calc(76px + env(safe-area-inset-top));
+  right:max(14px,env(safe-area-inset-right));width:370px;max-width:calc(100% - 28px);
+  max-height:calc(100dvh - 172px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow:auto;overscroll-behavior:contain;padding:18px 20px;
+  border:1px solid #dbe6dc;border-radius:18px;background:#f6f9f4;color:#193536;
+  box-shadow:0 16px 60px #0005;scrollbar-width:thin;
+}
+.ar-menu-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ar-menu-heading h2{font-size:1.25rem;font-weight:500;margin:0;letter-spacing:-.5px}
+.menu-close{width:44px;height:44px;flex-shrink:0;border:0;border-radius:10px;background:#e4ede3;color:#31574a;font-size:26px;line-height:1}
+.ar-menu-intro{font-size:.875rem;line-height:1.6;color:#597266;margin:10px 0 18px}
+.ar-menu .experiment-bar{margin:0 0 18px;padding-bottom:18px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:14px}
+.ar-menu .prediction{margin-left:auto}
+.ar-menu .field-label,.ar-menu .training-metrics span,.ar-menu .section-heading .eyebrow{font-size:.875rem;letter-spacing:.5px}
+.ar-menu .sample-options button{min-width:46px;padding:9px 10px;font-size:.875rem}
+.ar-menu .training{padding:0 0 18px;border:0;background:none}
+.ar-menu .training-actions .button{min-height:46px}
+.ar-menu .training-metrics strong{font-size:1.5rem}
+.ar-menu .training-hint,.ar-menu .timeline-heading,.ar-menu .text-button{font-size:.875rem}
+.ar-scene-settings{border-top:1px solid var(--line);padding-top:10px}
+.ar-scene-settings summary{cursor:pointer;min-height:44px;padding:10px 0;font-weight:600;font-size:.9375rem;color:#31574a}
+.ar-scale-control{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.875rem;padding:8px 0}
+.ar-scale-control input{width:100%;min-height:40px;margin:0}
+.ar-menu-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:7px 0 10px}
+.ar-menu-actions button{min-height:44px;padding:9px 10px;border:1px solid #cfddce;border-radius:8px;background:#e8f0e5;color:#31574a;font-size:.875rem}
+#fullscreen-feedback{font-size:.875rem;line-height:1.5;color:#597266;margin:5px 0 10px}
+.ar-mode .ar-diagnostics{margin-top:12px;padding:10px 14px;border:0;border-radius:10px;background:#102a2b}
+.ar-mode .ar-diagnostics summary{font-size:.9375rem}
+@media(max-width:520px){
+  .ar-hud{gap:8px}
+  .ar-brand{font-size:1.05rem}
+  .ar-hud-button{padding:10px 12px}
+  .ar-menu{padding:14px 16px}
+  .ar-mode .scene-footer{padding:10px 12px;gap:8px}
+  .ar-mode .scene-footer #tracking-status{font-size:.875rem}
+  .ar-mode .scene-footer .scene-action{flex-basis:95px;flex-shrink:0;font-size:.875rem}
+}
+@media(max-height:500px) and (orientation:landscape){
+  .ar-hud{padding-top:max(8px,env(safe-area-inset-top));padding-bottom:10px}
+  .ar-hud-button{min-height:44px}
+  .ar-menu{top:calc(62px + env(safe-area-inset-top));max-height:calc(100dvh - 138px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+  .ar-mode .ar-tools{bottom:calc(86px + env(safe-area-inset-bottom))}
+  .ar-mode .scene-footer{bottom:calc(8px + env(safe-area-inset-bottom));min-height:44px;padding:7px 12px}
+}
